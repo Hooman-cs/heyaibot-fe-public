@@ -1,0 +1,451 @@
+.formColumn {
+  padding: 20px;
+  background-color: #fefefe;
+  border-radius: 16px;
+  
+  transition: transform 0.3s ease;
+  animation: fadeInUp 0.4s ease;
+}
+
+.formGroup {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+.errorInput {
+  border-color: #e53e3e !important;
+}
+
+.errorText {
+  color: #e53e3e;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+.errorText {
+  color: red;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.formGroup label {
+  font-size: 16px;
+  font-weight: 500;
+  color: #444;
+  margin-bottom: 8px;
+}
+
+.formGroup input,
+.formGroup textarea {
+  padding: 12px 14px;
+  font-size: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.formGroup input:focus,
+.formGroup textarea:focus {
+  border-color: #4caf50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+  outline: none;
+}
+
+.formGroup textarea {
+  resize: vertical;
+}
+
+.addButton {
+  
+  align-self: flex-start;
+  padding: 8px 16px;
+  font-size: 14px;
+  background-color: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  margin-top: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.addButton:hover {
+  background-color: #43a047;
+  transform: scale(1.03);
+}
+
+.addButton1 {
+  
+  align-self: flex-start;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.addButton1:hover {
+  background-color: #43a047;
+  transform: scale(1.03);
+}
+
+@media (max-width: 768px) {
+  .addButton1 {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.keywordInput {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.keywordInput input {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .formColumn {
+    padding: 15px;
+  }
+
+  .keywordInput {
+    flex-direction: column;
+  }
+
+  .addButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* CSS Module - e.g., RoleDropdown.module.css */
+
+
+
+.roleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+ margin-top: 10px;
+}
+
+.roleLabel {
+  font-size: 16px;
+  font-weight: 600;
+ 
+}
+
+/* Dropdown Container */
+.dropdownContainer {
+  position: relative;
+  width: 150px;
+}
+
+.dropdownButton {
+  width: 100%;
+  padding: 12px 16px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+.dropdownButton:hover {
+  background: #43a047;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.dropdownButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.3);
+}
+
+.selectedText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdownIcon {
+  transition: transform 0.3s ease;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.rotated {
+  transform: rotate(180deg);
+}
+
+/* Dropdown Menu */
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdownItem {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #333;
+  font-size: 14px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dropdownItem:hover {
+  background: #f1f8e9;
+  color: #2e7d32;
+  padding-left: 20px;
+}
+
+.dropdownItem.selected {
+  background: #e8f5e9;
+  color: #4caf50;
+  font-weight: 500;
+  position: relative;
+}
+
+.dropdownItem.selected::before {
+  content: '✓';
+  position: absolute;
+  right: 16px;
+  color: #0a0a0a;
+}
+
+/* Role Title Label */
+
+/* Add these styles to your ConfigForm.module.css */
+
+.disabledInput {
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.disabledButton {
+  background-color: #ccc;
+  border-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.disabledButton:hover {
+  background-color: #ccc;
+  border-color: #ccc;
+}
+
+/* Optional: Style for the role values section */
+.roleValuesList {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.roleValuesList h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.valuesList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.valueItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin-bottom: 5px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.valueItem:last-child {
+  margin-bottom: 0;
+}
+
+.valueActions {
+  display: flex;
+  gap: 8px;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.iconButton:hover {
+  color: #333;
+}
+
+.iconButton:disabled {
+  color: #ccc;
+  cursor: not-allowed;
+}
+/* Add these styles to your ConfigForm.module.css */
+
+.disabledInput {
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.disabledButton {
+  background-color: #ccc;
+  border-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.disabledButton:hover {
+  background-color: #ccc;
+  border-color: #ccc;
+}
+
+.disabledIcon {
+  color: #999;
+}
+
+/* Style for disabled dropdown button */
+.dropdownButton:disabled {
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  cursor: not-allowed;
+}
+
+.dropdownButton:disabled .selectedText {
+  color: #999;
+}
+
+/* Optional: Style for the role values section */
+.roleValuesList {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.roleValuesList h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.valuesList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.valueItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin-bottom: 5px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.valueItem:last-child {
+  margin-bottom: 0;
+}
+
+.valueActions {
+  display: flex;
+  gap: 8px;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.iconButton:hover {
+  color: #333;
+}
+
+.iconButton:disabled {
+  color: #ccc;
+  cursor: not-allowed;
+}
+/* Add to your existing styles */
+.roleManagementLabel {
+  margin-bottom: 8px;
+  display: block;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Or if you want to target specifically this case */
+.selectedRoleHeader .roleManagementLabel {
+  margin-bottom: 8px;
+  display: block;
+}

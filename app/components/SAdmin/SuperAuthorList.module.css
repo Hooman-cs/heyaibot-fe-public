@@ -1,0 +1,731 @@
+/* Main Layout - Top and Bottom */
+.listView {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.mainLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* Website List Section - Top */
+.websiteListSection {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e1e5e9;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.listTitle {
+  font-size: 1.5rem;
+  color: #1e293b;
+  margin: 0;
+  font-weight: 700;
+}
+
+.statusSummary {
+  display: flex;
+  gap: 16px;
+  font-size: 0.875rem;
+}
+
+.activeCount, .inactiveCount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: #f8fafc;
+  font-weight: 500;
+}
+
+.statusIndicatorActive, .statusIndicatorInactive {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusIndicatorActive {
+  background: #10b981;
+}
+
+.statusIndicatorInactive {
+  background: #6b7280;
+}
+
+/* Item List */
+.itemList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.item {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 2px solid #f1f5f9;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.item:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);
+}
+
+.item:hover::before {
+  opacity: 1;
+}
+
+.inactiveItem {
+  opacity: 0.7;
+  background: #f8fafc;
+}
+
+.inactiveItem:hover {
+  border-color: #6b7280;
+  transform: none;
+}
+
+.websiteInfo {
+  margin-bottom: 16px;
+}
+
+.websiteMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+}
+
+.websiteId {
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.metaIcon {
+  color: #667eea;
+}
+
+.websiteStatus {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.websiteStatus[data-status="active"] {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.websiteStatus[data-status="inactive"] {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.websiteName {
+  font-size: 1.25rem;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.websiteUrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #667eea;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+
+.urlIcon {
+  color: #667eea;
+  flex-shrink: 0;
+}
+
+.urlLink {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.urlLink:hover {
+  color: #764ba2;
+  text-decoration: underline;
+}
+
+.websiteDetails {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.detailItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+}
+
+.detailItem:last-child {
+  margin-bottom: 0;
+}
+
+.detailLabel {
+  color: #6b7280;
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.detailValue {
+  color: #374151;
+  flex: 1;
+  text-align: right;
+}
+
+.inactiveMessage {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-top: 12px;
+  border-left: 3px solid #f59e0b;
+}
+
+.itemActions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 16px;
+}
+
+.editButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.editButton:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* Configuration Section - Bottom */
+.configSectionWrapper {
+  width: 100%;
+}
+
+.configSection {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 0;
+  color: white;
+  box-shadow: 0 8px 40px rgba(102, 126, 234, 0.3);
+  overflow: hidden;
+}
+
+.configHeader {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.configTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.configIcon {
+  font-size: 1.5rem;
+}
+
+.configBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.configContent {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.configItem {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.configItem:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.configItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.configItemTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.configItemIcon {
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+.copyButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 6px;
+  padding: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copyButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.configValue {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.configLink {
+  color: #a3e635;
+  text-decoration: none;
+  word-break: break-all;
+  transition: color 0.2s ease;
+  font-weight: 500;
+}
+
+.configLink:hover {
+  color: #bef264;
+  text-decoration: underline;
+}
+
+.configEmpty {
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Code Container - Full Code Always Visible */
+.codeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.integrationCode {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 16px;
+  border-radius: 8px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  word-break: break-all;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  max-height: 400px;
+  overflow-y: auto;
+  margin: 0;
+}
+
+.codeFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.codeLength {
+  font-weight: 600;
+}
+
+.codeNote {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+/* Quick Actions */
+.quickActions {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 20px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quickActionsTitle {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  text-decoration: none;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.actionButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+/* No Configuration Section */
+.noConfigSection {
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.noConfigContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #64748b;
+}
+
+.noConfigIcon {
+  font-size: 3rem;
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+.noConfigContent h4 {
+  margin: 0;
+  color: #475569;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.noConfigContent p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.setupTips {
+  margin-top: 16px;
+  text-align: left;
+  width: 100%;
+  max-width: 300px;
+}
+
+.setupTips h5 {
+  margin: 0 0 8px 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.setupTips ul {
+  margin: 0;
+  padding-left: 16px;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.setupTips li {
+  margin-bottom: 4px;
+}
+
+/* Copy Notification */
+.copyNotification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #10b981;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+.copyCheckIcon {
+  font-size: 0.8rem;
+}
+
+/* Loading States */
+.configLoading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 24px;
+  color: #64748b;
+  font-size: 0.9rem;
+  justify-content: center;
+}
+
+.loadingSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #cbd5e1;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty List State */
+.emptyList {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+  background-color: #f8f9fa;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.emptyIllustration {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.emptyIcon {
+  color: white;
+}
+
+.emptyList h3 {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.emptyList p {
+  color: #666;
+  margin-bottom: 24px;
+  font-size: 1rem;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .listView {
+    padding: 16px;
+  }
+  
+  .websiteListSection,
+  .configSection {
+    padding: 20px;
+  }
+  
+  .topBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .statusSummary {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .itemList {
+    grid-template-columns: 1fr;
+  }
+  
+  .configHeader {
+    padding: 16px 20px;
+  }
+  
+  .configContent {
+    padding: 20px;
+  }
+  
+  .configItem {
+    padding: 16px;
+  }
+  
+  .actionButtons {
+    flex-direction: column;
+  }
+  
+  .actionButton {
+    min-width: auto;
+  }
+  
+  .integrationCode {
+    padding: 12px;
+    font-size: 0.75rem;
+    max-height: 300px;
+  }
+  
+  .codeFooter {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .websiteListSection,
+  .configSection,
+  .noConfigSection {
+    padding: 16px;
+  }
+  
+  .configContent {
+    padding: 16px;
+  }
+  
+  .configItem {
+    padding: 12px;
+  }
+  
+  .integrationCode {
+    padding: 12px;
+    font-size: 0.7rem;
+    max-height: 250px;
+  }
+}

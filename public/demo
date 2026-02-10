@@ -1,0 +1,278 @@
+(function () {
+    try {
+        // Get the current script element (this script)
+        var currentScript = document.currentScript;
+        var appId = '';
+        
+        console.log('Chat Widget: Starting initialization...');
+        
+        // If we found the current script and it has data-app-id attribute
+        if (currentScript && currentScript.hasAttribute('data-app-id')) {
+            appId = currentScript.getAttribute('data-app-id');
+            console.log('Chat Widget: Found appId from currentScript:', appId);
+        } else {
+            // Fallback: search for any script with data-app-id
+            var scripts = document.querySelectorAll('script[data-app-id]');
+            if (scripts.length > 0) {
+                appId = scripts[scripts.length - 1].getAttribute('data-app-id');
+                console.log('Chat Widget: Found appId from querySelector:', appId);
+            } else {
+                console.log('Chat Widget: No appId found in any script tag');
+            }
+        }
+        
+        var iframe = document.createElement('iframe');
+        var baseUrl = 'https://www.heyaibot.com';
+        
+        // Build URL with appId parameter if available
+        var iframeUrl = new URL(baseUrl);
+        if (appId) {
+            iframeUrl.searchParams.set('appId', appId);
+            console.log('Chat Widget: Setting appId parameter in URL:', appId);
+        }
+        
+        console.log('Chat Widget: Final iframe URL:', iframeUrl.toString());
+        
+        iframe.src = iframeUrl.toString();
+        iframe.id = 'chat-widget-iframe';
+        iframe.style.width = '340px';
+        iframe.style.height = '470px';
+        iframe.style.position = 'fixed';
+        iframe.style.bottom = '90px'; // Changed from 20px to 90px to appear above icon
+        iframe.style.right = '20px';
+        iframe.style.zIndex = '999998';
+        iframe.style.border = 'none'; // No border
+        iframe.style.borderRadius = '12px';
+        iframe.style.opacity = '0';
+        iframe.style.transform = 'translateY(20px) scale(0.95)';
+        iframe.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        iframe.style.pointerEvents = 'none';
+        iframe.style.boxShadow = 'none'; // No box shadow
+        
+        // BLUR EFFECT COMPLETELY REMOVE करने के लिए important styles
+        iframe.style.filter = 'none';
+        iframe.style.backdropFilter = 'none';
+        iframe.style.webkitBackdropFilter = 'none';
+        
+        // Store appId in iframe data attribute
+        if (appId) {
+            iframe.setAttribute('data-app-id', appId);
+        }
+        
+        // Create chat icon button
+        var chatIcon = document.createElement('div');
+        chatIcon.id = 'chat-widget-icon';
+        chatIcon.innerHTML = `
+            <!-- Chat icon (message bubble) -->
+            <svg id="chat-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); opacity: 1; transform: scale(1) rotate(0deg);">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            
+            <!-- Cross icon (hidden by default) -->
+            <svg id="cross-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; opacity: 0; transform: rotate(45deg) scale(0.5); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        `;
+        
+        // Style the chat icon container
+        chatIcon.style.position = 'fixed';
+        chatIcon.style.bottom = '20px';
+        chatIcon.style.right = '20px';
+        chatIcon.style.width = '60px';
+        chatIcon.style.height = '60px';
+        chatIcon.style.backgroundColor = 'tomato'; // Changed to tomato color
+        chatIcon.style.borderRadius = '50%';
+        chatIcon.style.display = 'flex';
+        chatIcon.style.alignItems = 'center';
+        chatIcon.style.justifyContent = 'center';
+        chatIcon.style.cursor = 'pointer';
+        chatIcon.style.zIndex = '999999';
+        chatIcon.style.border = 'none'; // No border on icon
+        chatIcon.style.boxShadow = 'none'; // No box shadow on icon
+        chatIcon.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        chatIcon.style.color = 'white';
+        
+        // Add CSS for animations
+        var style = document.createElement('style');
+        style.textContent = `
+            #chat-widget-icon {
+                --chat-icon-color: tomato;
+                --chat-icon-hover: #ff4500; /* Darker tomato */
+            }
+            
+            #chat-widget-icon:hover {
+                transform: scale(1.1);
+                background-color: var(--chat-icon-hover);
+            }
+            
+            #chat-widget-icon:active {
+                transform: scale(1.05);
+            }
+            
+            /* Chat icon animation when iframe is open */
+            #chat-widget-icon.open #chat-icon-svg {
+                opacity: 0 !important;
+                transform: rotate(-180deg) scale(0.5) !important;
+            }
+            
+            /* Cross icon animation when iframe is open */
+            #chat-widget-icon.open #cross-icon-svg {
+                opacity: 1 !important;
+                transform: rotate(0deg) scale(1) !important;
+            }
+            
+            /* Icon bounce animation */
+            @keyframes iconBounce {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.15); }
+            }
+            
+            /* Initial animation when widget loads - REMOVED PULSE WITH BOX-SHADOW */
+            #chat-widget-icon {
+                animation: iconBounce 2s ease-in-out 1s 3;
+            }
+            
+            /* Remove all box-shadow animations */
+            #chat-widget-iframe {
+                box-shadow: none !important;
+            }
+            
+            /* Ensure no box-shadow on iframe when open */
+            #chat-widget-iframe[style*="opacity: 1"] {
+                animation: none;
+                box-shadow: none !important;
+            }
+            
+            /* When iframe is open, make it appear above other content */
+            #chat-widget-iframe[style*="opacity: 1"] {
+                z-index: 999998 !important;
+            }
+        `;
+        
+        document.head.appendChild(style);
+        
+        // Get references to the icons
+        var chatIconSvg = chatIcon.querySelector('#chat-icon-svg');
+        var crossIconSvg = chatIcon.querySelector('#cross-icon-svg');
+        
+        // State variable to track if iframe is open
+        var isIframeOpen = false;
+        
+        // Toggle iframe visibility
+        function toggleIframe() {
+            isIframeOpen = !isIframeOpen;
+            
+            if (isIframeOpen) {
+                // Show iframe with animation
+                iframe.style.opacity = '1';
+                iframe.style.transform = 'translateY(0) scale(1)';
+                iframe.style.pointerEvents = 'auto';
+                
+                // Change icon to cross
+                chatIcon.classList.add('open');
+                
+                // Add bounce animation to icon
+                chatIcon.style.animation = 'iconBounce 0.5s ease';
+                
+                // Change background color to darker tomato when open
+                chatIcon.style.backgroundColor = '#ff4500';
+                
+            } else {
+                // Hide iframe with animation
+                iframe.style.opacity = '0';
+                iframe.style.transform = 'translateY(20px) scale(0.95)';
+                iframe.style.pointerEvents = 'none';
+                
+                // Change back to chat icon
+                chatIcon.classList.remove('open');
+                chatIcon.style.animation = '';
+                
+                // Change background color back to tomato
+                chatIcon.style.backgroundColor = 'tomato';
+            }
+        }
+        
+        // Add click event to chat icon
+        chatIcon.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleIframe();
+        });
+        
+        // REMOVED: Close iframe when clicking outside - This line is removed
+        // document.addEventListener('click', function(event) {
+        //     if (isIframeOpen && 
+        //         !chatIcon.contains(event.target) && 
+        //         !iframe.contains(event.target)) {
+        //         toggleIframe();
+        //     }
+        // });
+        
+        // REMOVED: Close iframe on Escape key - This line is removed
+        // document.addEventListener('keydown', function(event) {
+        //     if (event.key === 'Escape' && isIframeOpen) {
+        //         toggleIframe();
+        //     }
+        // });
+        
+        // Prevent iframe clicks from bubbling (but keep iframe functional)
+        iframe.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // Do NOT close the iframe when clicking inside it
+        });
+        
+        // Listen for messages from iframe to control icon state
+        window.addEventListener('message', function(event) {
+            // Check if message is from our iframe
+            if (event.source === iframe.contentWindow) {
+                if (event.data === 'close-chat') {
+                    toggleIframe();
+                }
+            }
+        });
+        
+        // Append elements to body
+        document.body.appendChild(iframe);
+        document.body.appendChild(chatIcon);
+        
+        console.log('Chat Widget: Successfully loaded with appId:', appId || 'No appId');
+        
+        // Send message to iframe about appId when it loads
+        iframe.addEventListener('load', function() {
+            if (appId) {
+                iframe.contentWindow.postMessage({
+                    type: 'appId',
+                    appId: appId
+                }, baseUrl);
+            }
+        });
+        
+        // Function to close iframe programmatically (can be called from iframe)
+        window.closeChatWidget = function() {
+            if (isIframeOpen) {
+                toggleIframe();
+            }
+        };
+        
+        // Function to open iframe programmatically
+        window.openChatWidget = function() {
+            if (!isIframeOpen) {
+                toggleIframe();
+            }
+        };
+        
+        // Function to get current iframe state
+        window.getChatWidgetState = function() {
+            return {
+                isOpen: isIframeOpen,
+                appId: appId
+            };
+        };
+        
+        // Make functions available globally
+        window.toggleChatWidget = toggleIframe;
+        
+    } catch (error) {
+        console.error('Error loading chat widget:', error);
+    }
+})();

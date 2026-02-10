@@ -1,0 +1,1743 @@
+'use client';
+import { useState, useEffect, useRef } from 'react';
+import styles from './ChatWidget.module.css';
+import ChatHeader from '../ChatHeader/ChatHeader';
+import ChatBody from '../ChatBody/ChatBody';
+import ChatInput from '../ChatInput/ChatInput';
+import config from '../utils/config';
+
+const ChatWidget = ({
+  primaryColor = '#4a6baf',
+  secondaryColor = 'tomato',
+  widgetPosition = { right: '0px', bottom: '0px' },
+  chatWindowSize = { width: '340px', height: '470px' },
+  aiApiKey = config.aiApiKey,
+  backendApiKey = config.backendApiKey,
+  apiBaseUrl = config.apiBaseUrl,
+}) => {
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [systemPrompts, setSystemPrompts] = useState([]);
+  const [welcomeMessages, setWelcomeMessages] = useState([]);
+  const [websiteTitle, setWebsiteTitle] = useState('Support');
+  const [pendingQuestions, setPendingQuestions] = useState([]);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [activeConfig, setActiveConfig] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [aifuture, setAifuture] = useState([]);
+  const [currentPromptFlow, setCurrentPromptFlow] = useState(null);
+  const [collectedData, setCollectedData] = useState({});
+  const [transformedDataForAPI, setTransformedDataForAPI] = useState({});
+  const [suggestedPrompts, setSuggestedPrompts] = useState([]);
+  const [currentChildOptions, setCurrentChildOptions] = useState([]);
+  const [isWebsiteActive, setIsWebsiteActive] = useState(false);
+  const [websiteStatus, setWebsiteStatus] = useState('checking');
+  const [storedUrls, setStoredUrls] = useState([]);
+  const [storedApiKeys, setStoredApiKeys] = useState([]);
+  const [storedPromptsWithParams, setStoredPromptsWithParams] = useState([]);
+  const [messageAnimations, setMessageAnimations] = useState({});
+  const hasShownWelcome = useRef(false);
+  const [selectedPromptName, setSelectedPromptName] = useState('');
+  const [parentWebsiteUrl, setParentWebsiteUrl] = useState('');
+  const [aiPersonality, setAiPersonality] = useState({
+    tone: 'friendly',
+    emojiLevel: 'moderate',
+    detailLevel: 'balanced'
+  });
+  const [interestDetectionEnabled, setInterestDetectionEnabled] = useState(true);
+  const [recentTopics, setRecentTopics] = useState([]);
+  const [autoClickInProgress, setAutoClickInProgress] = useState(false);
+
+  // Setup postMessage communication with parent
+  const setupParentCommunication = () => {
+    if (typeof window === 'undefined') return;
+    
+    window.addEventListener('message', (event) => {
+      const allowedOrigins = [
+        'https://jdpcglobal.com',
+        'https://www.jdpcglobal.com',
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173'
+      ];
+      
+      const isAllowedOrigin = allowedOrigins.includes(event.origin) || 
+                             event.origin.includes('localhost') ||
+                             event.origin.includes('127.0.0.1');
+      
+      if (!isAllowedOrigin) return;
+      
+      if (event.data.type === 'parentUrl') {
+        setParentWebsiteUrl(event.data.url);
+        localStorage.setItem('parentWebsiteUrl', event.data.url);
+      }
+      
+      if (event.data.type === 'pageUrl') {
+        setParentWebsiteUrl(event.data.url);
+        localStorage.setItem('parentWebsiteUrl', event.data.url);
+      }
+    });
+    
+    try {
+      window.parent.postMessage(
+        { 
+          type: 'requestParentUrl',
+          source: 'chat-widget'
+        },
+        '*'
+      );
+    } catch (error) {}
+  };
+
+  const getParentWebsiteUrl = () => {
+    if (typeof window !== 'undefined') {
+      if (parentWebsiteUrl) return parentWebsiteUrl;
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const parentUrlParam = urlParams.get('parentUrl') || urlParams.get('siteUrl') || urlParams.get('sourceUrl');
+      if (parentUrlParam) {
+        setParentWebsiteUrl(parentUrlParam);
+        return parentUrlParam;
+      }
+      
+      if (document.referrer && document.referrer !== '' && 
+          !document.referrer.includes(window.location.hostname)) {
+        setParentWebsiteUrl(document.referrer);
+        return document.referrer;
+      }
+      
+      const storedParentUrl = localStorage.getItem('parentWebsiteUrl');
+      if (storedParentUrl) {
+        setParentWebsiteUrl(storedParentUrl);
+        return storedParentUrl;
+      }
+      
+      return window.location.href;
+    }
+    return '';
+  };
+
+  const getCurrentWebsiteUrl = () => {
+    if (typeof window !== 'undefined') {
+      const parentUrl = getParentWebsiteUrl();
+      
+      if (parentUrl && parentUrl !== window.location.href && 
+          !parentUrl.includes(window.location.hostname)) {
+        return parentUrl;
+      }
+      
+      return window.location.href;
+    }
+    return '';
+  };
+
+  const normalizeUrl = (url) => {
+    if (!url || url.trim() === '') return '';
+    
+    try {
+      let normalized = url.trim();
+      normalized = normalized.replace(/^(https?:\/\/)?(www\.)?/, '');
+      normalized = normalized.replace(/\/$/, '');
+      normalized = normalized.split('?')[0];
+      normalized = normalized.split('#')[0];
+      normalized = normalized.toLowerCase();
+      return normalized;
+    } catch (error) {
+      return url || '';
+    }
+  };
+
+  const extractDomain = (url) => {
+    if (!url) return '';
+    
+    try {
+      const normalized = normalizeUrl(url);
+      const domain = normalized.split('/')[0];
+      return domain;
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const checkUrlMatch = (databaseUrl, currentUrl) => {
+    if (!databaseUrl || !currentUrl) return false;
+    
+    const normalizedDatabase = normalizeUrl(databaseUrl);
+    const normalizedCurrent = normalizeUrl(currentUrl);
+    
+    const databaseDomain = extractDomain(databaseUrl);
+    const currentDomain = extractDomain(currentUrl);
+    
+    const directDomainMatch = databaseDomain === currentDomain;
+    const fullUrlMatch = normalizedDatabase === normalizedCurrent;
+    const substringMatch = normalizedCurrent.includes(normalizedDatabase) || 
+                          normalizedDatabase.includes(normalizedCurrent);
+    
+    return directDomainMatch || substringMatch || fullUrlMatch;
+  };
+
+  const getDatabaseUrlFromHeaderAPI = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/websites/header?apiKey=${encodeURIComponent(backendApiKey)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      
+      if (data.success && data.item && data.item.websiteUrl) {
+        return {
+          websiteUrl: data.item.websiteUrl,
+          websiteName: data.item.websiteName || 'Support',
+          status: data.item.status || 'active',
+          websiteId: data.item.websiteId || data.item.id
+        };
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const fetchWelcomeMessages = async (websiteId) => {
+    if (!websiteId || !apiBaseUrl || !backendApiKey) return [];
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/websites/chat-config?apiKey=${backendApiKey}&websiteId=${websiteId}`
+      );
+      const data = await response.json();
+
+      if (data.success && data.item?.systemPrompt) {
+        return data.item.systemPrompt
+          .map(p => p.content)
+          .filter(msg => msg && msg.trim());
+      }
+      return [];
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const fetchWebsiteConfig = async (websiteId) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/websites/client-config?apiKey=${encodeURIComponent(backendApiKey)}&websiteId=${websiteId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      
+      if (data.success && data.item) {
+        if (data.item.aifuture) setAifuture(data.item.aifuture);
+        if (data.item.aiPersonality) setAiPersonality(data.item.aiPersonality);
+        
+        // Extract suggested prompts from system prompts
+        if (data.item.systemPrompt && data.item.systemPrompt.length > 0) {
+          const prompts = data.item.systemPrompt
+            .map(p => p.content)
+            .filter(p => p && p.trim().length > 0);
+          setSuggestedPrompts(prompts);
+        }
+        
+        // Also check for custom prompts
+        if (data.item.customPrompt?.length > 0) {
+          setSuggestedPrompts(prev => [...prev, ...data.item.customPrompt]);
+        }
+        
+        return data.item;
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const showServiceUnavailableMessage = (status) => {
+    let message = '';
+    
+    switch (status) {
+      case 'inactive':
+        message = '⏸️ Chat service is temporarily disabled for this website. Please contact the website administrator for assistance.';
+        break;
+      case 'url_mismatch':
+        message = '🚫 This chat widget is not authorized for this website URL. Please contact the website administrator.';
+        break;
+      case 'not_found':
+        message = '❌ Website configuration not found. Please check if the website is properly configured.';
+        break;
+      case 'error':
+        message = '❌ Service is currently unavailable. Please try again later.';
+        break;
+      default:
+        message = '❌ Service is currently unavailable. Please try again later.';
+    }
+    
+    setMessages([{
+      sender: 'support-bot',
+      message: message,
+      createdAt: new Date().toISOString(),
+      isAdmin: true,
+      isError: true,
+    }]);
+  };
+
+  const showWelcomeMessage = (backendWelcomeMessages, websiteData) => {
+    if (hasShownWelcome.current) return;
+    
+    let welcomeMessage = '';
+    
+    if (backendWelcomeMessages && backendWelcomeMessages.length > 0) {
+      const randomIndex = Math.floor(Math.random() * backendWelcomeMessages.length);
+      welcomeMessage = backendWelcomeMessages[randomIndex];
+    } else if (websiteData.systemPrompt && websiteData.systemPrompt.length > 0) {
+      const randomIndex = Math.floor(Math.random() * websiteData.systemPrompt.length);
+      welcomeMessage = websiteData.systemPrompt[randomIndex];
+    } else {
+      const welcomeGreetings = [
+        `🌟 **Hello there!** I'm your ${websiteData.websiteName || 'AI'} assistant. How can I brighten your day today? 😊`,
+        `👋 **Hey! Welcome!** I'm here to help you with anything about ${websiteData.websiteName || 'our services'}. What's on your mind?`,
+        `🤖 **Greetings!** I'm your friendly ${websiteData.websiteName || 'Support'} bot, ready to assist you! How may I help?`,
+        `💫 **Hi there!** Welcome to ${websiteData.websiteName || 'our chat'}. I'm excited to help you today! What can I do for you?`,
+        `🎯 **Hello!** I'm your dedicated assistant for ${websiteData.websiteName || 'this website'}. Let me know how I can assist you!`
+      ];
+      welcomeMessage = welcomeGreetings[Math.floor(Math.random() * welcomeGreetings.length)];
+    }
+    
+    setMessages([{
+      sender: 'support-bot',
+      message: welcomeMessage,
+      createdAt: new Date().toISOString(),
+      isAdmin: true,
+    }]);
+    hasShownWelcome.current = true;
+  };
+
+  // Initialize chat widget
+  useEffect(() => {
+    const initializeChat = async () => {
+      setupParentCommunication();
+      const currentUrl = getCurrentWebsiteUrl();
+      const databaseConfig = await getDatabaseUrlFromHeaderAPI();
+      
+      if (databaseConfig) {
+        const databaseUrl = databaseConfig.websiteUrl;
+        const websiteStatus = databaseConfig.status?.toLowerCase();
+        
+        if (websiteStatus !== 'active') {
+          setWebsiteStatus('inactive');
+          setIsWebsiteActive(false);
+          setConnectionStatus('offline');
+          setWebsiteTitle(databaseConfig.websiteName || 'Support');
+          showServiceUnavailableMessage('inactive');
+          hasShownWelcome.current = true;
+          return;
+        }
+        
+        const isUrlMatch = checkUrlMatch(databaseUrl, currentUrl);
+        
+        if (isUrlMatch) {
+          setWebsiteStatus('active');
+          setIsWebsiteActive(true);
+          setConnectionStatus('online');
+          setWebsiteTitle(databaseConfig.websiteName || 'Support');
+          
+          const websiteData = await fetchWebsiteConfig(databaseConfig.websiteId);
+          if (websiteData) {
+            setActiveConfig(websiteData);
+            setCategories(websiteData.category || []);
+            setSystemPrompts(websiteData.systemPrompt || []);
+            
+            if (websiteData.customPrompt?.length > 0) {
+              setSuggestedPrompts(websiteData.customPrompt);
+            }
+            
+            const backendWelcomeMessages = await fetchWelcomeMessages(databaseConfig.websiteId);
+            setWelcomeMessages(backendWelcomeMessages);
+            showWelcomeMessage(backendWelcomeMessages, websiteData);
+          } else {
+            showWelcomeMessage([], databaseConfig);
+          }
+        } else {
+          setWebsiteStatus('url_mismatch');
+          setIsWebsiteActive(false);
+          setConnectionStatus('offline');
+          setWebsiteTitle(databaseConfig.websiteName || 'Support');
+          showServiceUnavailableMessage('url_mismatch');
+          hasShownWelcome.current = true;
+        }
+      } else {
+        setWebsiteStatus('not_found');
+        setIsWebsiteActive(false);
+        setConnectionStatus('offline');
+        showServiceUnavailableMessage('not_found');
+        hasShownWelcome.current = true;
+      }
+    };
+    
+    initializeChat();
+  }, [apiBaseUrl, backendApiKey]);
+
+  // Check backend connection
+  useEffect(() => {
+    if (!isWebsiteActive || websiteStatus === 'inactive') return;
+
+    const checkConnection = async () => {
+      try {
+        const currentUrl = getCurrentWebsiteUrl();
+        const res = await fetch(`${apiBaseUrl}/api/websites/header?apiKey=${encodeURIComponent(backendApiKey)}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.item) {
+            const websiteStatus = data.item.status?.toLowerCase();
+            if (websiteStatus !== 'active') {
+              setIsWebsiteActive(false);
+              setWebsiteStatus('inactive');
+              setConnectionStatus('offline');
+              
+              if (hasShownWelcome.current) {
+                setMessages(prev => [...prev, {
+                  sender: 'support-bot',
+                  message: '⏸️ Chat service is temporarily disabled for this website. Please contact the website administrator for assistance.',
+                  createdAt: new Date().toISOString(),
+                  isAdmin: true,
+                  isError: true,
+                }]);
+              }
+              return;
+            }
+            
+            const databaseUrl = data.item.websiteUrl || '';
+            if (databaseUrl) {
+              const isUrlMatch = checkUrlMatch(databaseUrl, currentUrl);
+              
+              if (!isUrlMatch) {
+                setIsWebsiteActive(false);
+                setWebsiteStatus('url_mismatch');
+                setConnectionStatus('offline');
+                
+                if (hasShownWelcome.current) {
+                  setMessages(prev => [...prev, {
+                    sender: 'support-bot',
+                    message: '🚫 This chat widget is not authorized for this website URL. Please contact the website administrator.',
+                    createdAt: new Date().toISOString(),
+                    isAdmin: true,
+                    isError: true,
+                  }]);
+                }
+                return;
+              }
+            }
+            setConnectionStatus('online');
+          } else {
+            setConnectionStatus('offline');
+          }
+        } else {
+          setConnectionStatus('offline');
+        }
+      } catch (error) {
+        setConnectionStatus('offline');
+      }
+    };
+    
+    checkConnection();
+    const interval = setInterval(checkConnection, 10000);
+    return () => clearInterval(interval);
+  }, [apiBaseUrl, isWebsiteActive, backendApiKey, websiteStatus]);
+
+  // Animation for new messages
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.sender === 'support-bot') {
+      const messageId = Date.now();
+      setMessageAnimations(prev => ({ ...prev, [messageId]: 'typing' }));
+      
+      setTimeout(() => {
+        setMessageAnimations(prev => ({ ...prev, [messageId]: 'visible' }));
+      }, Math.min(lastMessage.message.length * 30, 1500));
+    }
+  }, [messages]);
+
+  const handleInactiveInteraction = () => {
+    if (websiteStatus === 'inactive') {
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: '⏸️ Chat service is temporarily disabled for this website. Please contact the website administrator for assistance.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      }]);
+    }
+    return false;
+  };
+
+  const transformDataWithParams = (originalData, promptsWithParams) => {
+    if (!promptsWithParams || promptsWithParams.length === 0) {
+      return originalData;
+    }
+
+    const transformedData = {};
+    const textToParamMap = {};
+    
+    promptsWithParams.forEach(item => {
+      if (item.text && item.parameter && item.parameter.key) {
+        textToParamMap[item.text] = item.parameter.key;
+      }
+    });
+    
+    Object.entries(originalData).forEach(([textKey, value]) => {
+      const paramKey = textToParamMap[textKey] || textKey;
+      transformedData[paramKey] = value;
+    });
+    
+    return transformedData;
+  };
+
+  const completePromptFlow = (data) => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+    
+    let transformedData = {};
+    
+    if (storedPromptsWithParams && storedPromptsWithParams.length > 0) {
+      transformedData = transformDataWithParams(data, storedPromptsWithParams);
+    } else {
+      transformedData = { ...data };
+    }
+    
+    setCollectedData(data);
+    setTransformedDataForAPI(transformedData);
+    
+    let summary = "📋 **Summary of Your Details** 📋\n\n";
+    let count = 1;
+
+    Object.entries(data).forEach(([key, value]) => {
+      summary += `${count}) **${key}** : ${value}\n`;
+      count++;
+    });
+    
+    summary += "\n✨ **Please confirm if all details are correct!** ✨";
+
+    setMessages(prev => [...prev, {
+      sender: 'support-bot',
+      message: summary,
+      createdAt: new Date().toISOString(),
+      isAdmin: true,
+    }]);
+
+    setTimeout(() => {
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: '🎉 **All done!** Would you like to confirm this request?',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      }]);
+      setIsConfirming(true);
+      setCurrentPromptFlow(null);
+    }, 1000);
+  };
+
+  const handleConfirmResponse = async (answer) => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+
+    setIsConfirming(false);
+    setCurrentChildOptions([]);
+    
+    setMessages(prev => [...prev, {
+      sender: 'user',
+      message: answer,
+      createdAt: new Date().toISOString(),
+      isAdmin: false,
+    }]);
+
+    try {
+      if (answer === 'Yes') {
+        setMessages(prev => [...prev, {
+          sender: 'support-bot',
+          message: '💾 **Saving your request...**',
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        }]);
+
+        const formData = new FormData();
+        formData.append("websiteId", activeConfig.websiteId || activeConfig.id);
+        formData.append("promptName", selectedPromptName);
+        
+        Object.entries(transformedDataForAPI).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            formData.append(key, value);
+          }
+        });
+
+        const execResponse = await fetch(`${apiBaseUrl}/api/execute-urls`, {
+          method: "POST",
+          body: formData
+        });
+
+        const execResult = await execResponse.json();
+        const urlCallResults = execResult.results || [];
+
+        const saveResponse = await fetch(`${apiBaseUrl}/api/chat-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${backendApiKey}`
+          },
+          body: JSON.stringify({
+            websiteId: activeConfig?.id,
+            collectedData: transformedDataForAPI,
+            originalData: collectedData,
+            backendApiKey: backendApiKey,
+            status: 'pending',
+            urlCallResults: urlCallResults.length > 0 ? urlCallResults : undefined
+          })
+        });
+
+        const saveResult = await saveResponse.json();
+
+        if (saveResult.success) {
+          setMessages(prev => prev.filter(msg => msg.message !== '💾 **Saving your request...**'));
+          
+          const successMessages = [
+            '🎉 **Excellent!** Your request has been confirmed successfully! We\'ll contact you shortly. 😊',
+            '✅ **Perfect!** Your request is saved and we\'ll get back to you soon! Thank you! 🌟',
+            '✨ **Awesome!** All done! Your request is confirmed and our team will reach out to you. 👍',
+            '💫 **Request Confirmed!** We\'ve saved all your details and will contact you shortly. Thank you! 🎯'
+          ];
+          
+          const randomSuccessMsg = successMessages[Math.floor(Math.random() * successMessages.length)];
+          
+          setMessages(prev => [...prev, {
+            sender: 'support-bot',
+            message: randomSuccessMsg,
+            createdAt: new Date().toISOString(),
+            isAdmin: true,
+          }]);
+        } else {
+          throw new Error(saveResult.message || 'Failed to save request');
+        }
+      } else {
+        const cancelResponse = await fetch(`${apiBaseUrl}/api/chat-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${backendApiKey}`
+          },
+          body: JSON.stringify({
+            websiteId: activeConfig?.id,
+            collectedData: transformedDataForAPI,
+            originalData: collectedData,
+            status: 'cancelled'
+          })
+        });
+
+        await cancelResponse.json();
+        
+        const cancelMessages = [
+          '👌 **No worries!** Your request has been cancelled. Feel free to update and try again later! 😊',
+          '🔙 **Cancelled!** You can update your request anytime or try again later. We\'re here to help!',
+          '💭 **Request cancelled.** No problem at all! Come back whenever you\'re ready. 😄',
+          '🔄 **Cancellation complete.** Feel free to restart the process whenever you\'re ready! 👍'
+        ];
+        
+        const randomCancelMsg = cancelMessages[Math.floor(Math.random() * cancelMessages.length)];
+        
+        setMessages(prev => [...prev, {
+          sender: 'support-bot',
+          message: randomCancelMsg,
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        }]);
+      }
+    } catch (error) {
+      setMessages(prev => prev.filter(msg => msg.message !== '💾 **Saving your request...**'));
+      
+      const errorMessages = [
+        '😕 **Oops!** There was a small hiccup processing your request. Please try again in a moment!',
+        '⚠️ **Temporary Issue:** There was an error processing your request. Could you please try again?',
+        '🔧 **Technical Glitch:** We encountered an issue. Please try again or contact support if it persists.',
+        '🌀 **Something went wrong.** Please try again or refresh the page and start over.'
+      ];
+      
+      const randomErrorMsg = errorMessages[Math.floor(Math.random() * errorMessages.length)];
+      
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: randomErrorMsg,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      }]);
+    } finally {
+      setCollectedData({});
+      setTransformedDataForAPI({});
+      setCurrentPromptFlow(null);
+      setStoredUrls([]);
+      setStoredApiKeys([]);
+      setStoredPromptsWithParams([]);
+      setRecentTopics([]);
+    }
+  };
+
+  // Extract topics from text
+  const extractTopicsFromText = (text) => {
+    if (!text || typeof text !== 'string') return [];
+    
+    const textLower = text.toLowerCase();
+    const topics = [];
+    
+    const topicPatterns = {
+      'seo': ['seo', 'search engine optimization', 'search engine', 'rank', 'ranking', 'google'],
+      'website': ['website', 'web design', 'web development', 'site', 'webpage', 'landing page'],
+      'marketing': ['marketing', 'digital marketing', 'social media', 'promotion', 'advertising'],
+      'design': ['design', 'graphic design', 'ui/ux', 'interface', 'visual'],
+      'development': ['development', 'coding', 'programming', 'software', 'app'],
+      'content': ['content', 'writing', 'blog', 'article', 'copywriting'],
+      'support': ['support', 'help', 'assistance', 'service'],
+      'booking': ['booking', 'reservation', 'appointment'],
+      'consultation': ['consultation', 'meeting', 'discussion'],
+      'pricing': ['pricing', 'price', 'cost', 'budget']
+    };
+
+    Object.entries(topicPatterns).forEach(([topic, keywords]) => {
+      const hasTopic = keywords.some(keyword => textLower.includes(keyword));
+      if (hasTopic) {
+        topics.push(topic);
+      }
+    });
+
+    return topics;
+  };
+
+  // Check user interest in response
+  const checkUserInterest = (userMessage) => {
+    if (!userMessage || typeof userMessage !== 'string') return false;
+    
+    const messageLower = userMessage.toLowerCase();
+    
+    // Positive interest keywords
+    const interestKeywords = [
+      'yes', 'sure', 'interested', 'definitely', 'absolutely', 'please',
+      'tell me', 'i want', 'i need', 'go ahead', 'okay', 'ok', 'yeah', 'yep',
+      'of course', 'certainly', 'why not', 'let\'s do it', 'proceed',
+      'continue', 'start', 'begin', 'show me', 'give me', 'provide',
+      'explain', 'details', 'more info', 'information', 'help me'
+    ];
+    
+    
+    const negativeKeywords = [
+      'no', 'not', 'don\'t', 'dont', 'never', 'nah', 'nope',
+      'not interested', 'not now', 'later', 'maybe later',
+      'some other time', 'no thanks', 'not today'
+    ];
+    
+   
+    const hasInterest = interestKeywords.some(keyword => 
+      messageLower.includes(keyword)
+    );
+    
+    // Check for negative interest
+    const hasNegative = negativeKeywords.some(keyword => 
+      messageLower.includes(keyword)
+    );
+    
+    return hasInterest && !hasNegative;
+  };
+
+
+  const generateAIResponse = async (question) => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return {
+        response: websiteStatus === 'inactive' 
+          ? '⏸️ Chat service is temporarily disabled for this website. Please contact the website administrator for assistance.'
+          : websiteStatus === 'url_mismatch' 
+          ? '🚫 This chat widget is not authorized for this website URL.'
+          : '❌ Service is currently unavailable.'
+      };
+    }
+
+    try {
+      setIsLoading(true);
+      
+      const aifutureData = activeConfig?.aifuture || aifuture || [];
+      
+      // Check if user shows interest in the question itself
+      const userShowsInterest = checkUserInterest(question);
+      
+      // Extract topics from question
+      const questionTopics = extractTopicsFromText(question);
+      if (questionTopics.length > 0) {
+        setRecentTopics(prev => [...new Set([...prev, ...questionTopics])].slice(0, 5));
+      }
+      
+      const res = await fetch(
+        `${apiBaseUrl}/api/generate-ai-response`,
+        {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${backendApiKey}`
+          },
+          body: JSON.stringify({
+            question: question,
+            websiteTitle: websiteTitle,
+            categories: activeConfig?.category || categories || [],
+            aifuture: aifutureData,
+            personality: aiPersonality,
+            conversationHistory: messages.slice(-5).map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.message
+            })),
+            // Add context for better responses
+            context: {
+              userInterested: userShowsInterest,
+              recentTopics: questionTopics,
+              suggestedPrompts: suggestedPrompts.slice(0, 5)
+            }
+          })
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(`API Error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      
+      if (data.success) {
+        // Extract topics from AI response
+        const responseTopics = extractTopicsFromText(data.response);
+        if (responseTopics.length > 0) {
+          setRecentTopics(prev => [...new Set([...prev, ...responseTopics])].slice(0, 5));
+        }
+        
+        return { 
+          response: data.response,
+          formattedResponse: data.formattedResponse || data.response,
+          topics: responseTopics,
+          userInterested: userShowsInterest
+        };
+      } else {
+        return { 
+          response: data.message || "😊 I'm having trouble processing that. Could you please rephrase your question?"
+        };
+      }
+    } catch (error) {
+      console.error("AI Response Error:", error);
+      
+      const fallbackResponses = [
+        "🤔 **Hmm, I'm having trouble connecting to my knowledge base right now.** Could you try again in a moment?",
+        "🔌 **Connection issue detected.** Please try your question again, or check back in a few minutes!",
+        "💡 **Technical hiccup!** I couldn't process your request. Please try again or rephrase your question.",
+        "⚡ **Temporary glitch!** Let's try that again. Could you rephrase your question?"
+      ];
+      
+      return { 
+        response: fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)]
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Enhanced Send Message with interest detection
+  const handleSendMessage = async (text) => {
+    if (!text.trim() || isLoading) return;
+
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+
+    const userMsg = { 
+      sender: 'user', 
+      message: text, 
+      createdAt: new Date().toISOString(), 
+      isAdmin: false 
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setInputMessage('');
+
+    // Check current flow state
+    if (currentPromptFlow && currentPromptFlow.waitingForOption) {
+      handleOptionSelect(text);
+      return;
+    }
+
+    if (currentPromptFlow && currentPromptFlow.currentQuestion) {
+      handlePromptFlowResponse(text);
+      return;
+    }
+
+    if (pendingQuestions.length > 0 || isConfirming) {
+      setTimeout(() => handleNextQuestion(text), 800);
+      return;
+    }
+
+    setIsLoading(true);
+    
+    // Check if user response shows interest in previous AI message
+    const userShowsInterest = checkUserInterest(text);
+    const lastAIMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+    
+    if (userShowsInterest && lastAIMessage && lastAIMessage.isAdmin && interestDetectionEnabled) {
+      // Extract topics from last AI message
+      const aiTopics = extractTopicsFromText(lastAIMessage.message);
+      
+      if (aiTopics.length > 0 && suggestedPrompts.length > 0 && !currentPromptFlow) {
+        // Find matching prompts
+        const matchingPrompts = suggestedPrompts.filter(prompt => {
+          const promptLower = prompt.toLowerCase();
+          return aiTopics.some(topic => {
+            const topicKeywordsMap = {
+              'seo': ['seo', 'search engine'],
+              'website': ['website', 'web design'],
+              'marketing': ['marketing', 'digital'],
+              'design': ['design', 'graphic'],
+              'development': ['development', 'software'],
+              'content': ['content', 'writing'],
+              'support': ['support', 'help'],
+              'booking': ['booking', 'reservation'],
+              'consultation': ['consultation', 'meeting'],
+              'pricing': ['pricing', 'price']
+            };
+            
+            const keywords = topicKeywordsMap[topic] || [topic];
+            return keywords.some(keyword => promptLower.includes(keyword));
+          });
+        });
+        
+        if (matchingPrompts.length > 0) {
+          // Notify ChatBody about user interest
+          const interestEvent = new CustomEvent('userInterestDetected', {
+            detail: {
+              type: 'userInterested',
+              userMessage: text,
+              aiTopics: aiTopics,
+              matchingPrompts: matchingPrompts
+            }
+          });
+          window.dispatchEvent(interestEvent);
+          
+          // Auto-click the most relevant prompt
+          setAutoClickInProgress(true);
+          setTimeout(() => {
+            handlePromptClick(matchingPrompts[0]);
+            setAutoClickInProgress(false);
+          }, 1000);
+          
+          // Don't generate additional AI response
+          setIsLoading(false);
+          return;
+        }
+      }
+    }
+
+    // Generate AI response
+    const { response, topics } = await generateAIResponse(text);
+    const botMsg = {
+      sender: 'support-bot',
+      message: response,
+      createdAt: new Date().toISOString(),
+      isAdmin: true,
+    };
+    setMessages((prev) => [...prev, botMsg]);
+    setIsLoading(false);
+  };
+
+  const makeFriendly = (text) => {
+    if (typeof text !== "string" || !text.trim()) {
+      return "Could you please provide some information? 🤔";
+    }
+    
+    const friendlyPrompts = [
+      `Could you please share **${text}**? 😊`,
+      `May I know **${text}**? 👀`,
+      `Please tell me **${text}** 📝`,
+      `I'd love to know **${text}**! ❤️`,
+      `Let me know **${text}** ✨`,
+      `Could you provide **${text}**? 🙏`
+    ];
+    return friendlyPrompts[Math.floor(Math.random() * friendlyPrompts.length)];
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhoneNumber = (phone) => {
+    const cleanedPhone = phone.replace(/\D/g, '');
+    const isValidLength = cleanedPhone.length === 10;
+    const isValidFormat = /^\d+$/.test(cleanedPhone);
+    return isValidLength && isValidFormat;
+  };
+
+  const validateNumber = (number) => {
+    return !isNaN(number) && number.trim() !== '';
+  };
+
+  const validateDate = (date) => {
+    const dateStr = date.trim();
+    if (dateStr.includes(' to ')) {
+      const [startDate, endDate] = dateStr.split(' to ').map(d => d.trim());
+      return validateSingleDate(startDate) && validateSingleDate(endDate);
+    }
+    return validateSingleDate(dateStr);
+  };
+
+  const validateSingleDate = (dateStr) => {
+    const dateFormats = [
+      /^\d{1,2}-\d{1,2}-\d{4}$/,
+      /^\d{1,2}\/\d{1,2}\/\d{4}$/,
+      /^\d{4}-\d{1,2}-\d{1,2}$/
+    ];
+    const isValidFormat = dateFormats.some(format => format.test(dateStr));
+    if (!isValidFormat) return false;
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime()) && dateStr.trim() !== '';
+  };
+
+  const validateURL = (url) => {
+    const urlStr = url.trim();
+    if (urlStr === '') return false;
+    
+    const urlPatterns = [
+      /^(https?:\/\/)?(www\.)?[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](\.[a-zA-Z]{2,})+(:\d{1,5})?(\/[a-zA-Z0-9-._~:?#@!$&'()*+,;=]*)?$/,
+      /^(https?:\/\/)?localhost(:\d{1,5})?(\/[a-zA-Z0-9-._~:?#@!$&'()*+,;=]*)?$/,
+      /^(https?:\/\/)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d{1,5})?(\/[a-zA-Z0-9-._~:?#@!$&'()*+,;=]*)?$/,
+      /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/
+    ];
+    
+    return urlPatterns.some(pattern => pattern.test(urlStr));
+  };
+
+  const validateInput = (fieldType, value) => {
+    switch (fieldType) {
+      case 'email':
+        return validateEmail(value);
+      case 'number':
+        return validateNumber(value);
+      case 'phone':
+        return validatePhoneNumber(value);
+      case 'date':
+        return validateDate(value);
+      case 'url':
+        return validateURL(value);
+      default:
+        return value.trim() !== '';
+    }
+  };
+
+  const getFieldType = (text) => {
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('email') || lowerText.includes('e-mail')) return 'email';
+    if (lowerText.includes('phone') || lowerText.includes('mobile')) return 'phone';
+    if (lowerText.includes('number') || lowerText.includes('guest')) return 'number';
+    if (lowerText.includes('url') || lowerText.includes('website') || lowerText.includes('link') || lowerText.includes('web')) return 'url';
+    if (lowerText.includes('date') || lowerText.includes('stay') || lowerText.includes('check-in') || lowerText.includes('check-out')) return 'date';
+    return 'text';
+  };
+
+  const handlePromptFlowResponse = (userAnswer) => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+
+    const { currentQuestion } = currentPromptFlow;
+    const fieldType = getFieldType(currentQuestion.text);
+
+    if (!validateInput(fieldType, userAnswer)) {
+      let errorMessage = '';
+      switch (fieldType) {
+        case 'email':
+          errorMessage = '📧 **Please enter a valid email address** (e.g., name@example.com)';
+          break;
+        case 'phone':
+          errorMessage = '📱 **Please enter a valid 10-digit phone number**';
+          break;
+        case 'number':
+          errorMessage = '🔢 **Please enter a valid number**';
+          break;
+        case 'date':
+          errorMessage = '📅 **Please enter valid dates** (e.g., "15-12-2024 to 20-12-2024" or "15/12/2024")';
+          break;
+        case 'url':
+          errorMessage = '🔗 **Please enter a valid URL** (e.g., http://example.com)';
+          break;
+        default:
+          errorMessage = '❌ **Please provide a valid response**';
+      }
+
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: errorMessage,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      }]);
+      return;
+    }
+
+    const newCollectedData = {
+      ...collectedData,
+      [currentQuestion.text]: userAnswer
+    };
+    setCollectedData(newCollectedData);
+    moveToNextQuestion(newCollectedData);
+  };
+
+  const moveToNextQuestion = (data) => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+
+    const { prompts, promptIndex, questionIndex } = currentPromptFlow;
+    const currentPrompt = prompts[promptIndex];
+    
+    if (currentPromptFlow.isSingleChild && questionIndex === 0) {
+      const nextPromptIndex = promptIndex + 1;
+      if (nextPromptIndex < prompts.length) {
+        const nextPrompt = prompts[nextPromptIndex];
+        
+        if (nextPrompt.children && nextPrompt.children.length > 0) {
+          if (nextPrompt.children.length === 1) {
+            const singleChild = nextPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false,
+              childOptions: null,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: true
+            });
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              }]);
+            }, 1000);
+          } else {
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: nextPrompt,
+              waitingForOption: false,
+              childOptions: nextPrompt.children,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: false
+            });
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                sender: 'support-bot',
+                message: makeFriendly(nextPrompt.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              }]);
+
+              setTimeout(() => {
+                showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex);
+              }, 1000);
+            }, 1000);
+          }
+        } else {
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: nextPromptIndex,
+            questionIndex: 0,
+            currentQuestion: nextPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: currentPromptFlow.promptName,
+            isSingleChild: false
+          });
+
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            }]);
+          }, 1000);
+        }
+      } else {
+        completePromptFlow(data);
+      }
+      return;
+    }
+
+    if (currentPrompt.children && currentPrompt.children.length > 0 && questionIndex === 0) {
+      showOptionsAfterQuestion(currentPrompt.children, prompts, promptIndex);
+      return;
+    }
+
+    const nextQuestionIndex = questionIndex + 1;
+    
+    if (nextQuestionIndex < (currentPrompt.children?.length || 0)) {
+      const nextQuestion = currentPrompt.children[nextQuestionIndex];
+      setCurrentPromptFlow(prev => ({
+        ...prev,
+        questionIndex: nextQuestionIndex,
+        currentQuestion: nextQuestion
+      }));
+
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: makeFriendly(nextQuestion.text),
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      }]);
+    } else {
+      const nextPromptIndex = promptIndex + 1;
+      if (nextPromptIndex < prompts.length) {
+        const nextPrompt = prompts[nextPromptIndex];
+        
+        if (nextPrompt.children && nextPrompt.children.length > 0) {
+          if (nextPrompt.children.length === 1) {
+            const singleChild = nextPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false,
+              childOptions: null,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: true
+            });
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              }]);
+            }, 1000);
+          } else {
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: nextPrompt,
+              waitingForOption: false,
+              childOptions: nextPrompt.children,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: false
+            });
+
+            setMessages(prev => [...prev, {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            }]);
+
+            if (nextPrompt.children && nextPrompt.children.length > 0) {
+              setTimeout(() => {
+                showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex);
+              }, 1000);
+            }
+          }
+        } else {
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: nextPromptIndex,
+            questionIndex: 0,
+            currentQuestion: nextPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: currentPromptFlow.promptName,
+            isSingleChild: false
+          });
+
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            }]);
+          }, 1000);
+        }
+      } else {
+        completePromptFlow(data);
+      }
+    }
+  };
+
+  const showOptionsAfterQuestion = (children, prompts, promptIndex) => {
+    if (children.length > 1) {
+      const optionsList = children.map(child => `• **${child.text}**`).join('\n');
+      
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: `**Please choose one of the following options:**\n\n${optionsList}\n\n👇 *Type your choice*`,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isOptions: true,
+      }]);
+
+      setCurrentChildOptions(children.map(child => child.text));
+
+      setCurrentPromptFlow(prev => ({
+        ...prev,
+        waitingForOption: true,
+        childOptions: children,
+        currentQuestion: { text: 'Select Option' }
+      }));
+    } else if (children.length === 1) {
+      const singleChild = children[0];
+      setCurrentPromptFlow(prev => ({
+        ...prev,
+        waitingForOption: false,
+        currentQuestion: singleChild,
+        isSingleChild: true
+      }));
+
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          sender: 'support-bot',
+          message: makeFriendly(singleChild.text),
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        }]);
+      }, 500);
+    }
+  };
+
+  const handleOptionSelect = (optionText) => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+
+    const { prompts, promptIndex, childOptions } = currentPromptFlow;
+    
+    const selectedOption = childOptions.find(opt => opt.text === optionText);
+    
+    if (!selectedOption) {
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: '❌ **Please select a valid option** from the available choices.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      }]);
+      return;
+    }
+
+    const newCollectedData = {
+      ...collectedData,
+      [prompts[promptIndex].text]: optionText
+    };
+    setCollectedData(newCollectedData);
+    setCurrentChildOptions([]);
+
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage.isOptions) {
+      setMessages(prev => [...prev, {
+        sender: 'user',
+        message: optionText,
+        createdAt: new Date().toISOString(),
+        isAdmin: false,
+      }]);
+    }
+
+    if (selectedOption.children && selectedOption.children.length > 0) {
+      if (selectedOption.children.length === 1) {
+        const singleChild = selectedOption.children[0];
+        setCurrentPromptFlow(prev => ({
+          ...prev,
+          waitingForOption: false,
+          currentQuestion: singleChild,
+          isSingleChild: true
+        }));
+
+        setTimeout(() => {
+          setMessages(prev => [...prev, {
+            sender: 'support-bot',
+            message: makeFriendly(singleChild.text),
+            createdAt: new Date().toISOString(),
+            isAdmin: true,
+          }]);
+        }, 500);
+      } else {
+        setTimeout(() => {
+          showOptionsAfterQuestion(selectedOption.children, prompts, promptIndex);
+        }, 500);
+      }
+    } else {
+      const nextPromptIndex = promptIndex + 1;
+      if (nextPromptIndex < prompts.length) {
+        const nextPrompt = prompts[nextPromptIndex];
+        
+        if (nextPrompt.children && nextPrompt.children.length > 0) {
+          if (nextPrompt.children.length === 1) {
+            const singleChild = nextPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false,
+              childOptions: null,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: true
+            });
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              }]);
+            }, 500);
+          } else {
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: nextPrompt,
+              waitingForOption: false,
+              childOptions: nextPrompt.children,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: false
+            });
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                sender: 'support-bot',
+                message: makeFriendly(nextPrompt.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              }]);
+
+              if (nextPrompt.children && nextPrompt.children.length > 0) {
+                setTimeout(() => {
+                  showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex);
+                }, 1000);
+              }
+            }, 500);
+          }
+        } else {
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: nextPromptIndex,
+            questionIndex: 0,
+            currentQuestion: nextPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: currentPromptFlow.promptName,
+            isSingleChild: false
+          });
+
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            }]);
+          }, 500);
+        }
+      } else {
+        completePromptFlow(newCollectedData);
+      }
+    }
+  };
+
+  const handlePromptClick = async (promptName) => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const childRes = await fetch(
+        `${apiBaseUrl}/api/childprompt/${activeConfig?.id}/${encodeURIComponent(promptName)}/filtered`,
+        { headers: { Authorization: `Bearer ${backendApiKey}` } }
+      );
+      const data = await childRes.json();
+
+      const promptsWithParams = data.promptsWithParams || [];
+      setSelectedPromptName(promptName);
+      setStoredPromptsWithParams(promptsWithParams);
+      
+      let prompts = [];
+      if (data.prompts) {
+        prompts = data.prompts;
+      } else if (data.items?.length) {
+        prompts = data.items.flatMap((item) => item.prompts);
+      }
+
+      setCollectedData({});
+      setTransformedDataForAPI({});
+      setCurrentChildOptions([]);
+
+      setMessages(prev => [...prev, {
+        sender: 'user',
+        message: promptName,
+        createdAt: new Date().toISOString(),
+        isAdmin: false,
+      }]);
+
+      const introMessages = [
+        `🎯 **Awesome choice!** Let's work on **${promptName}** together! 😊`,
+        `🚀 **Great!** Let's get started with **${promptName}**. I'll guide you step by step!`,
+        `✨ **Perfect!** I'll help you with **${promptName}**. Let's begin this journey!`,
+        `🤝 **Excellent!** Let's tackle **${promptName}** together. I'm here to help!`
+      ];
+
+      const randomIntro = introMessages[Math.floor(Math.random() * introMessages.length)];
+      
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: randomIntro,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      }]);
+
+      if (prompts.length > 0) {
+        const firstPrompt = prompts[0];
+        
+        if (firstPrompt.children && firstPrompt.children.length > 0) {
+          if (firstPrompt.children.length === 1) {
+            const singleChild = firstPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: 0,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false,
+              childOptions: null,
+              promptName: promptName,
+              isSingleChild: true
+            });
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              }]);
+            }, 1000);
+          } else {
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: 0,
+              questionIndex: 0,
+              currentQuestion: firstPrompt,
+              waitingForOption: false,
+              childOptions: firstPrompt.children,
+              promptName: promptName,
+              isSingleChild: false
+            });
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                sender: 'support-bot',
+                message: makeFriendly(firstPrompt.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              }]);
+
+              setTimeout(() => {
+                showOptionsAfterQuestion(firstPrompt.children, prompts, 0);
+              }, 1000);
+            }, 1000);
+          }
+        } else {
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: 0,
+            questionIndex: 0,
+            currentQuestion: firstPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: promptName,
+            isSingleChild: false
+          });
+
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              sender: 'support-bot',
+              message: makeFriendly(firstPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            }]);
+          }, 1000);
+        }
+      } else {
+        setMessages(prev => [...prev, {
+          sender: 'support-bot',
+          message: `🤗 **I'd be happy to help you with ${promptName}!** Please tell me your requirements and I'll assist you.`,
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        }]);
+        setCurrentPromptFlow(null);
+      }
+    } catch (err) {
+      console.error("Prompt Click Error:", err);
+      
+      setMessages(prev => [...prev, {
+        sender: 'user',
+        message: promptName,
+        createdAt: new Date().toISOString(),
+        isAdmin: false,
+      }]);
+
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: `💫 **I'd love to help with ${promptName}!** Please share what you need, and I'll do my best to assist! 😊`,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      }]);
+      setCurrentPromptFlow(null);
+    } finally {
+      setIsLoading(false);
+      setAutoClickInProgress(false);
+    }
+  };
+
+  const handleNextQuestion = (userAnswer = '') => {
+    if (!isWebsiteActive) {
+      handleInactiveInteraction();
+      return;
+    }
+
+    if (pendingQuestions.length > 0) {
+      const [next, ...rest] = pendingQuestions;
+      setPendingQuestions(rest);
+      setMessages(prev => [...prev, {
+        sender: 'support-bot',
+        message: makeFriendly(next),
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      }]);
+    } else if (!isConfirming && messages.length > 0) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          sender: 'support-bot',
+          message: '🎉 **All done!** Would you like to confirm this request?',
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        }]);
+        setIsConfirming(true);
+      }, 700);
+    }
+  };
+
+  const handleCloseChat = () => {
+    setIsChatOpen(false);
+    setCurrentPromptFlow(null);
+    setCollectedData({});
+    setTransformedDataForAPI({});
+    setCurrentChildOptions([]);
+    setStoredUrls([]);
+    setStoredApiKeys([]);
+    setStoredPromptsWithParams([]);
+    setRecentTopics([]);
+  };
+
+  const isInputDisabled = isLoading || isConfirming || 
+    (currentPromptFlow && currentPromptFlow.waitingForOption) || !isWebsiteActive || autoClickInProgress;
+
+  return (
+    <div
+      className={styles.chatWidgetContainer}
+      style={{ right: widgetPosition.right, bottom: widgetPosition.bottom }}
+    >
+      {isChatOpen && (
+        <div
+          className={styles.chatWidgetWindow}
+          style={{
+            width: chatWindowSize.width,
+            height: chatWindowSize.height,
+          }}
+        >
+          <ChatHeader
+            secondaryColor={secondaryColor}
+            connectionStatus={connectionStatus}
+            onClose={handleCloseChat}
+            websiteTitle={websiteTitle}
+            apiBaseUrl={apiBaseUrl}
+            backendApiKey={backendApiKey}
+            isWebsiteActive={isWebsiteActive}
+            websiteStatus={websiteStatus}
+          />
+
+          <ChatBody
+            messages={messages}
+            isLoading={isLoading}
+            primaryColor={primaryColor}
+            secondaryColor={secondaryColor}
+            apiBaseUrl={apiBaseUrl}
+            backendApiKey={backendApiKey}
+            onPromptClick={handlePromptClick}
+            onConfirmClick={handleConfirmResponse}
+            onOptionSelect={handleOptionSelect}
+            showConfirmButtons={isConfirming}
+            currentPromptFlow={currentPromptFlow}
+            suggestedPrompts={suggestedPrompts}
+            currentChildOptions={currentChildOptions}
+            isWebsiteActive={isWebsiteActive}
+            websiteStatus={websiteStatus}
+            messageAnimations={messageAnimations}
+          />
+
+          <ChatInput
+            inputMessage={inputMessage}
+            setInputMessage={setInputMessage}
+            sendMessage={handleSendMessage}
+            disabled={isInputDisabled}
+            primaryColor={primaryColor}
+            isWebsiteActive={isWebsiteActive}
+            websiteStatus={websiteStatus}
+          />
+          
+          {/* Auto-click indicator */}
+          {autoClickInProgress && (
+            <div className={styles.autoClickIndicator}>
+              <div className={styles.autoClickSpinner} />
+              <span>Auto-selecting relevant option...</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatWidget;

@@ -1,0 +1,13 @@
+@import "tailwindcss";
+ 
+/* Tailwind v4 automatically scans your /src folder.
+   You do not need to manually configure paths.
+*/
+ 
+html {
+  scroll-behavior: smooth;
+}
+ 
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}

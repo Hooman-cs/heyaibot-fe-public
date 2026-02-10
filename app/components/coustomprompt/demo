@@ -1,0 +1,537 @@
+"use client"
+
+import React, { useState, useEffect } from "react"
+import styles from "./APISettingsPopup.module.css"
+import config from '../utils/config';
+import { 
+  X, 
+  Link, 
+  Key, 
+  FileText, 
+  Trash2, 
+  Check, 
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Cog,
+  Lock,
+  Tag,
+  Loader2
+} from "lucide-react"
+
+type PromptParameter = {
+  id: string
+  key: string
+}
+
+type APIPrompt = {
+  id: string
+  text: string
+  parameter?: PromptParameter
+}
+
+type UseApiPopupProps = {
+  open: boolean
+  onClose: () => void
+  websiteId?: string 
+  promptName?: string
+  prompts?: Array<{ text: string }>
+}
+
+const UseApiPopup: React.FC<UseApiPopupProps> = ({ 
+  open, 
+  onClose,
+  websiteId,
+  promptName,
+  prompts = [] 
+}) => {
+  const [url, setUrl] = useState("")
+  const [apiKey, setApiKey] = useState("")
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [apiPrompts, setApiPrompts] = useState<APIPrompt[]>([])
+  const [newParamKey, setNewParamKey] = useState("")
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true)
+  
+  const API_BASE = `${config.apiBaseUrl}/api/childprompt`
+
+  useEffect(() => {
+    if (open) {
+      loadApiConfig()
+    } else {
+      setIsLoadingConfig(true)
+      setApiPrompts([])
+      setUrl("")
+      setApiKey("")
+    }
+  }, [open])
+
+  const loadApiConfig = async () => {
+    setIsLoadingConfig(true)
+    
+    try {
+      let serverData = null
+      
+      if (websiteId && promptName) {
+        const encodedPrompt = encodeURIComponent(promptName)
+        const res = await fetch(`${API_BASE}/${websiteId}/${encodedPrompt}`)
+        
+        if (res.ok) {
+          const data = await res.json()
+          serverData = data.data || data
+          
+          const urlsArray = serverData.urls || []
+          const apiKeysArray = serverData.apiKeys || []
+          
+          setUrl(urlsArray.length > 0 ? urlsArray[0] : "")
+          setApiKey(apiKeysArray.length > 0 ? apiKeysArray[0] : "")
+        }
+      }
+      
+      const rootPrompts = prompts || []
+      const initialPrompts: APIPrompt[] = []
+      
+      if (rootPrompts.length > 0) {
+        const serverPromptsWithParams = serverData?.promptsWithParams || []
+        const serverParamsMap = new Map()
+        
+        serverPromptsWithParams.forEach((p: any) => {
+          if (p.text && p.parameter) {
+            serverParamsMap.set(p.text, p.parameter)
+          }
+        })
+        
+        rootPrompts.forEach((prompt, index) => {
+          const promptText = prompt.text || `Prompt ${index + 1}`
+          const serverParam = serverParamsMap.get(promptText)
+          
+          initialPrompts.push({
+            id: `prompt-${index}-${Date.now()}`,
+            text: promptText,
+            parameter: serverParam ? {
+              id: serverParam.id || `param-${index}`,
+              key: serverParam.key || ""
+            } : undefined
+          })
+        })
+      }
+      
+      setApiPrompts(initialPrompts)
+      
+    } catch (error) {
+      const rootPrompts = prompts || []
+      const initialPrompts: APIPrompt[] = rootPrompts.map((prompt, index) => ({
+        id: `prompt-${index}-${Date.now()}`,
+        text: prompt?.text || `Prompt ${index + 1}`,
+        parameter: undefined
+      }))
+      setApiPrompts(initialPrompts)
+    } finally {
+      setIsLoadingConfig(false)
+    }
+  }
+
+  const handleAddParameter = (promptId: string) => {
+    if (!newParamKey.trim()) return
+    
+    const updatedPrompts = apiPrompts.map(prompt => {
+      if (prompt.id === promptId) {
+        return {
+          ...prompt,
+          parameter: {
+            id: `param-${Date.now()}`,
+            key: newParamKey.trim()
+          }
+        }
+      }
+      return prompt
+    })
+    
+    setApiPrompts(updatedPrompts)
+    setNewParamKey("")
+    setSelectedPromptId(null)
+  }
+
+  const handleUpdateParameter = (promptId: string, newKey: string) => {
+    const updatedPrompts = apiPrompts.map(prompt => {
+      if (prompt.id === promptId && prompt.parameter) {
+        return {
+          ...prompt,
+          parameter: {
+            ...prompt.parameter,
+            key: newKey
+          }
+        }
+      }
+      return prompt
+    })
+    
+    setApiPrompts(updatedPrompts)
+  }
+
+  const handleDeleteParameter = (promptId: string) => {
+    const updatedPrompts = apiPrompts.map(prompt => {
+      if (prompt.id === promptId) {
+        return {
+          ...prompt,
+          parameter: undefined
+        }
+      }
+      return prompt
+    })
+    
+    setApiPrompts(updatedPrompts)
+  }
+
+  const handleSave = async () => {
+    try {
+      setLoading(true)
+      
+      const promptsWithParams = apiPrompts
+        .filter(prompt => prompt.parameter)
+        .map(prompt => ({
+          text: prompt.text,
+          parameter: prompt.parameter || null
+        }))
+
+      if (websiteId && promptName) {
+        const encodedPrompt = encodeURIComponent(promptName)
+        const endpoint = `${API_BASE}/${websiteId}/${encodedPrompt}`
+        
+        let existingData = {}
+        try {
+          const res = await fetch(endpoint)
+          if (res.ok) {
+            const data = await res.json()
+            existingData = data.data || data
+          }
+        } catch (error) {}
+        
+        const updateData = {
+          ...existingData,
+          promptsWithParams: promptsWithParams,
+          urls: url ? [url] : [],
+          apiKeys: apiKey ? [apiKey] : [],
+          updatedAt: new Date().toISOString(),
+          websiteId,
+          promptName,
+          pk: `website#${websiteId}`,
+          sk: `prompt#${promptName}`
+        }
+        
+        const res = await fetch(endpoint, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData)
+        })
+        
+        if (!res.ok) {
+          throw new Error('Failed to save configuration')
+        }
+        
+        onClose()
+      } else {
+        const localConfig = {
+          url,
+          apiKey,
+          prompts: promptsWithParams,
+          savedAt: new Date().toISOString()
+        }
+        
+        localStorage.setItem('apiConfig', JSON.stringify(localConfig))
+        onClose()
+      }
+    } catch (error) {
+      // Handle error silently
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const groupedPrompts = []
+  for (let i = 0; i < apiPrompts.length; i += 2) {
+    groupedPrompts.push(apiPrompts.slice(i, i + 2))
+  }
+
+  if (!open) return null
+
+  return (
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.popup} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.header}>
+          <div className={styles.headerMain}>
+            <Cog className={styles.headerIcon} size={24} />
+            <div>
+              <h2>{promptName ? `API Configuration - ${promptName}` : "API Configuration"}</h2>
+              <p>Configure API parameters for root prompts{promptName ? ` in "${promptName}"` : ""}</p>
+            </div>
+          </div>
+          <button className={styles.closeButton} onClick={onClose} disabled={isLoadingConfig}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className={styles.content}>
+          {isLoadingConfig ? (
+            <div className={styles.loaderContainer}>
+              <div className={styles.loaderSpinner}>
+                <Loader2 size={48} className={styles.spinnerIcon} />
+              </div>
+              <div className={styles.loaderText}>
+                <h3>Loading API Configuration</h3>
+                <p>Please wait while we load your data...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className={styles.apiConfigSection}>
+                <div className={styles.apiConfigGrid}>
+                  <div className={styles.configInputGroup}>
+                    <div className={styles.inputLabel}>
+                      <Link size={16} />
+                      API URL
+                    </div>
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="https://api.example.com/v1"
+                      className={styles.urlInput}
+                    />
+                  </div>
+                  
+                  <div className={styles.configInputGroup}>
+                    <div className={styles.inputLabel}>
+                      <Key size={16} />
+                      API Key
+                    </div>
+                    <div className={styles.apiKeyWrapper}>
+                      <input
+                        type={showApiKey ? "text" : "password"}
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder="Enter your API key"
+                        className={styles.apiKeyInput}
+                      />
+                      <button
+                        type="button"
+                        className={styles.eyeToggle}
+                        onClick={() => setShowApiKey(!showApiKey)}
+                      >
+                        {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.promptsSection}>
+                <div className={styles.sectionHeader}>
+                  <div className={styles.sectionTitle}>
+                    <FileText size={20} />
+                    Root Prompts ({apiPrompts.length})
+                    <span className={styles.sectionSubtitle}>
+                      - Add API parameters to root prompts
+                    </span>
+                  </div>
+                  
+                  <div className={styles.sectionStats}>
+                    <div className={styles.statItem}>
+                      <Tag size={14} />
+                      <span>{apiPrompts.filter(p => p.parameter).length} with parameters</span>
+                    </div>
+                  </div>
+                </div>
+
+                {apiPrompts.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <div className={styles.emptyIllustration}>
+                      <FileText size={64} />
+                    </div>
+                    <h3>No Root Prompts</h3>
+                    <p>Create prompts in the main builder to configure API parameters</p>
+                  </div>
+                ) : (
+                  <div className={styles.promptsGrid}>
+                    {groupedPrompts.map((row, rowIndex) => (
+                      <div key={rowIndex} className={styles.promptRow}>
+                        {row.map((prompt, promptIndex) => (
+                          <div key={prompt.id} className={styles.promptCard}>
+                            <div className={styles.promptHeader}>
+                              <div className={styles.promptMeta}>
+                                <div className={styles.promptInfo}>
+                                  <div>
+                                    <div className={styles.promptNumber}>
+                                      Root Prompt {rowIndex * 2 + promptIndex + 1}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className={styles.promptStatus}>
+                                  {prompt.parameter ? (
+                                    <span className={styles.hasParameter}>
+                                      <Check size={12} />
+                                      Parameter Set
+                                    </span>
+                                  ) : (
+                                    <span className={styles.noParameter}>
+                                      <AlertCircle size={12} />
+                                      No Parameter
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className={styles.promptTextContainer}>
+                              <Lock size={14} className={styles.lockIcon} />
+                              <div className={styles.promptText} title={prompt.text}>
+                                {prompt.text}
+                              </div>
+                            </div>
+
+                            <div className={styles.parameterSection}>
+                              {prompt.parameter ? (
+                                <div className={styles.parameterCard}>
+                                  <div className={styles.parameterHeader}>
+                                    <Tag size={14} className={styles.paramIcon} />
+                                    <span className={styles.paramLabel}>Parameter Key:</span>
+                                  </div>
+                                  <div className={styles.parameterContent}>
+                                    <input
+                                      type="text"
+                                      value={prompt.parameter.key}
+                                      onChange={(e) => handleUpdateParameter(prompt.id, e.target.value)}
+                                      className={styles.parameterInput}
+                                      placeholder="parameter_key"
+                                    />
+                                    <button 
+                                      className={styles.deleteParamBtn}
+                                      onClick={() => handleDeleteParameter(prompt.id)}
+                                      title="Remove parameter"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className={styles.addParameterSection}>
+                                  {selectedPromptId === prompt.id ? (
+                                    <div className={styles.addParameterForm}>
+                                      <div className={styles.formHeader}>
+                                        <Tag size={14} />
+                                        <span>Add Parameter</span>
+                                      </div>
+                                      <div className={styles.formGroup}>
+                                        <input
+                                          type="text"
+                                          value={newParamKey}
+                                          onChange={(e) => setNewParamKey(e.target.value)}
+                                          placeholder="Enter parameter key"
+                                          className={styles.newParamInput}
+                                          onKeyDown={(e) => e.key === 'Enter' && handleAddParameter(prompt.id)}
+                                        />
+                                        <div className={styles.formActions}>
+                                          <button 
+                                            className={styles.confirmBtn}
+                                            onClick={() => handleAddParameter(prompt.id)}
+                                            disabled={!newParamKey.trim()}
+                                          >
+                                            <Check size={14} />
+                                            Add
+                                          </button>
+                                          <button 
+                                            className={styles.cancelBtn}
+                                            onClick={() => {
+                                              setSelectedPromptId(null)
+                                              setNewParamKey("")
+                                            }}
+                                          >
+                                            <X size={14} />
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className={styles.addParameterPrompt}>
+                                      <button 
+                                        className={styles.addParamBtn}
+                                        onClick={() => setSelectedPromptId(prompt.id)}
+                                      >
+                                        <Tag size={14} />
+                                        Add Parameter
+                                      </button>
+                                      <p className={styles.addPromptHint}>
+                                        Click to add API parameter for this prompt
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {row.length === 1 && (
+                          <div className={styles.emptyPromptSlot}></div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className={styles.footer}>
+          <div className={styles.footerStats}>
+            <div className={styles.totalPrompts}>
+              <span className={styles.totalNumber}>{apiPrompts.length}</span>
+              <span className={styles.totalLabel}>Root Prompts</span>
+            </div>
+            <div className={styles.configuredPrompts}>
+              <span className={styles.configuredNumber}>{apiPrompts.filter(p => p.parameter).length}</span>
+              <span className={styles.configuredLabel}>With Parameters</span>
+            </div>
+            <div className={styles.pendingPrompts}>
+              <span className={styles.pendingNumber}>{apiPrompts.length - apiPrompts.filter(p => p.parameter).length}</span>
+              <span className={styles.pendingLabel}>Pending</span>
+            </div>
+          </div>
+          
+          <div className={styles.footerActions}>
+            <button 
+              className={styles.cancelBtnLarge}
+              onClick={onClose}
+              disabled={loading || isLoadingConfig}
+            >
+              Cancel
+            </button>
+            <button 
+              className={styles.saveBtn}
+              onClick={handleSave}
+              disabled={loading || isLoadingConfig || apiPrompts.length === 0}
+            >
+              {loading ? (
+                <>
+                  <div className={styles.spinner}></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check size={18} />
+                  Save Configuration
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default UseApiPopup

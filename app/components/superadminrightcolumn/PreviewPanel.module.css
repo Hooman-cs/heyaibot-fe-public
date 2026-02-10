@@ -1,0 +1,316 @@
+.previewColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px;
+  height: 90%; 
+  box-sizing: border-box;
+  background-color: #f9f9fb;
+  font-family: 'Inter', 'Roboto', sans-serif;
+}
+
+/* ===================
+   Box Styling
+=================== */
+.previewBox {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 70vh; /* each section scrollable if content overflows */
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.previewBox:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ===================
+   Header
+=================== */
+.previewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.previewTitle {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #222;
+}
+
+.countBadge {
+  background-color: #e2e6ea;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  text-align: center;
+  line-height: 28px;
+  font-weight: bold;
+  color: #555;
+  font-size: 14px;
+}
+
+/* ===================
+   Categories Grid
+=================== */
+.categoryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 per row */
+  gap: 12px;
+}
+
+.categoryChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #e8f4ff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #222;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.categoryChip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background-color: #3498db;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ===================
+   Prompts
+=================== */
+.list {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 2 per row */
+  gap: 12px;
+}
+
+.promptText {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.removeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  font-size: 14px;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.removeButton:hover {
+  color: #ff4d4f;
+}
+
+.removeButton:active {
+  transform: scale(0.9);
+}
+
+/* Empty message */
+.emptyMessage {
+  padding: 12px 0;
+  font-size: 14px;
+  color: #888;
+  font-style: italic;
+  text-align: center;
+}
+
+/* Scrollbars */
+.previewBox::-webkit-scrollbar {
+  width: 6px;
+}
+
+.previewBox::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .previewTitle {
+    font-size: 16px;
+  }
+
+  .categoryChip, .promptText {
+    font-size: 13px;
+  }
+
+  .categoryGrid, .list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .previewColumn {
+    padding: 12px;
+  }
+
+  .previewBox {
+    padding: 12px;
+  }
+
+  .categoryChip, .promptText {
+    font-size: 12px;
+  }
+}
+/* ===================
+   Edit Section Styling
+=================== */
+.plushButton {
+  background: linear-gradient(145deg, #3498db, #2980b9); /* soft blue gradient */
+  color: white;
+  font-weight: bold;
+  font-size: 10px;
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
+  cursor: pointer; /* clickable */
+  box-shadow: 4px 4px 10px rgba(0,0,0,0.15), -4px -4px 10px rgba(255,255,255,0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plushButton:hover {
+  transform: scale(1.1); /* zoom on hover */
+  box-shadow: 6px 6px 14px rgba(0,0,0,0.2), -6px -6px 14px rgba(255,255,255,0.35);
+  background: linear-gradient(145deg, #2980b9, #3498db); /* subtle hover gradient */
+}
+
+.plushButton span {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.editButton {
+  background: #e0f2fe;
+  border: none;
+  color: #0284c7;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.25s ease;
+}
+
+.editButton:hover {
+  background: #bae6fd;
+  transform: scale(1.05);
+}
+
+.editBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.editInput {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d0d7de;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.editInput:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.editBox1 {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Save and Cancel buttons in one row */
+.saveBtn, .cancelBtn {
+  flex: 1;
+  max-width: 100px;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-size: 14px;
+}
+
+.saveBtn {
+  background: linear-gradient(90deg, #4ade80, #22c55e);
+  color: white;
+}
+
+.cancelBtn {
+  background: linear-gradient(90deg, #f87171, #ef4444);
+  color: white;
+}
+
+.saveBtn:hover {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  transform: translateY(-2px);
+}
+
+.cancelBtn:hover {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  transform: translateY(-2px);
+}
+
+.removeButton {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.removeButton:hover {
+  color: #ef4444;
+  transform: scale(1.1);
+}
+
+/* Smooth Fade Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+

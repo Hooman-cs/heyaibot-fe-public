@@ -1,0 +1,63 @@
+.chatWidgetAvatar {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  z-index: 10;
+  border: none;
+  outline: none;
+}
+
+.chatWidgetAvatar:hover {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.avatarIcon {
+  font-size: 28px;
+  z-index: 2;
+}
+
+.pulseEffect {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  opacity: 0.2;
+  z-index: 1;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.2;
+  }
+  70% {
+    transform: scale(1.1);
+    opacity: 0.05;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.2;
+  }
+}
+
+@media (max-width: 480px) {
+  .chatWidgetAvatar {
+    width: 55px;
+    height: 55px;
+    right: 12px;
+    bottom: 12px;
+  }
+  
+  .avatarIcon {
+    font-size: 24px;
+  }
+}

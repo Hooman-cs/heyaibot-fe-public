@@ -1,0 +1,229 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import styles from './PreviewPanel.module.css';
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+  exit: { opacity: 0, x: -50, transition: { duration: 0.2 } }
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+};
+
+const PreviewPanel = ({
+  categories = [],
+  systemPrompts = [],
+  customPrompts = [],
+  removeCategory,
+  removeSystemPrompt,
+  removeCustomPrompt,
+  setConfig // 🔥 We’ll need this to update edited values
+}) => {
+  const [editIndex, setEditIndex] = useState({ type: '', index: null });
+  const [editValue, setEditValue] = useState('');
+
+  const startEdit = (type, index, value) => {
+    setEditIndex({ type, index });
+    setEditValue(value);
+  };
+
+  const saveEdit = () => {
+    if (!editValue.trim()) return;
+
+    setConfig(prev => {
+      const newData = { ...prev };
+      if (editIndex.type === 'category') newData.category[editIndex.index] = editValue.trim();
+      if (editIndex.type === 'systemPrompt') newData.systemPrompt[editIndex.index] = editValue.trim();
+      if (editIndex.type === 'customPrompt') newData.customPrompt[editIndex.index] = editValue.trim();
+      return newData;
+    });
+
+    setEditIndex({ type: '', index: null });
+    setEditValue('');
+  };
+
+  const cancelEdit = () => {
+    setEditIndex({ type: '', index: null });
+    setEditValue('');
+  };
+
+  return (
+    <div className={styles.previewColumn}>
+      {/* Categories */}
+      <motion.div 
+        className={styles.previewBox}
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <div className={styles.previewHeader}>
+          <h3 className={styles.previewTitle}>
+            <span className={styles.titleIcon}>📂</span>
+            Categories
+          </h3>
+          <span className={styles.countBadge}>{categories.length}</span>
+        </div>
+        
+        <AnimatePresence>
+          {categories.length > 0 ? (
+            <motion.div className={styles.categoryGrid}>
+              {categories.map((cat, index) => (
+                <motion.div
+                  key={`cat-${index}`}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  whileHover={{ scale: 1.03 }}
+                  className={styles.categoryChip}
+                >
+                  {editIndex.type === 'category' && editIndex.index === index ? (
+                    <div className={styles.editBox}>
+                      <input
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className={styles.editInput}
+                      />
+                      <div className={styles.editBox1}>
+                      <button onClick={saveEdit} className={styles.saveBtn}>Save</button>
+                      <button onClick={cancelEdit} className={styles.cancelBtn}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <span className={styles.dot}></span>
+                      <span>{cat}</span>
+                      <div className={styles.actionButtons}>
+                        <motion.button
+                          className={styles.editButton}
+                          onClick={() => startEdit('category', index, cat)}
+                        >
+                          ✎
+                        </motion.button>
+                        <motion.button
+                          className={styles.removeButton}
+                          onClick={() => removeCategory(index)}
+                          whileHover={{ scale: 1.2 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          ✕
+                        </motion.button>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : (
+            <motion.p className={styles.emptyMessage}>✨ No categories added yet</motion.p>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* System Prompts */}
+      <motion.div className={styles.previewBox} initial="hidden" animate="visible" variants={containerVariants}>
+        <div className={styles.previewHeader}>
+          <h3 className={styles.previewTitle}>📝 System Prompts</h3>
+          <span className={styles.countBadge}>{systemPrompts.length}</span>
+        </div>
+        <AnimatePresence>
+          {systemPrompts.length > 0 ? (
+            <motion.ul className={styles.list}>
+              {systemPrompts.map((sp, index) => (
+                <motion.li key={`sys-${index}`} variants={itemVariants}>
+                  {editIndex.type === 'systemPrompt' && editIndex.index === index ? (
+                    <div className={styles.editBox}>
+                      <textarea
+                        rows={2}
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className={styles.editInput}
+                      />
+                      <button onClick={saveEdit} className={styles.saveBtn}>Save</button>
+                      <button onClick={cancelEdit} className={styles.cancelBtn}>Cancel</button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className={styles.promptText}>{sp}</span>
+                      <div className={styles.actionButtons}>
+                        <button
+                          className={styles.editButton}
+                          onClick={() => startEdit('systemPrompt', index, sp)}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className={styles.removeButton}
+                          onClick={() => removeSystemPrompt(index)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </motion.li>
+              ))}
+            </motion.ul>
+          ) : (
+            <motion.p className={styles.emptyMessage}>✨ No system prompts added yet</motion.p>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Custom Prompts */}
+      <motion.div className={styles.previewBox} initial="hidden" animate="visible" variants={containerVariants}>
+        <div className={styles.previewHeader}>
+          <h3 className={styles.previewTitle}>⚙️ Custom Prompts</h3>
+          <span className={styles.countBadge}>{customPrompts.length}</span>
+        </div>
+        <AnimatePresence>
+          {customPrompts.length > 0 ? (
+            <motion.ul className={styles.list}>
+              {customPrompts.map((cp, index) => (
+                <motion.li key={`cus-${index}`} variants={itemVariants}>
+                  {editIndex.type === 'customPrompt' && editIndex.index === index ? (
+                    <div className={styles.editBox}>
+                      <input
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className={styles.editInput}
+                      />
+                      <button onClick={saveEdit} className={styles.saveBtn}>Save</button>
+                      <button onClick={cancelEdit} className={styles.cancelBtn}>Cancel</button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className={styles.promptText}>{cp}</span>
+                      <div className={styles.actionButtons}>
+                        <button
+                          className={styles.editButton}
+                          onClick={() => startEdit('customPrompt', index, cp)}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className={styles.removeButton}
+                          onClick={() => removeCustomPrompt(index)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </motion.li>
+              ))}
+            </motion.ul>
+          ) : (
+            <motion.p className={styles.emptyMessage}>✨ No custom prompts added yet</motion.p>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+};
+
+export default PreviewPanel;

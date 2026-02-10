@@ -1,0 +1,303 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import styles from './ChatBody.module.css';
+import { Check, CheckCheck } from 'lucide-react';
+
+const ChatBody = ({
+  messages,
+  isLoading,
+  primaryColor = '#4a6baf',
+  secondaryColor = 'tomato',
+  apiBaseUrl,
+  backendApiKey = '',
+  onPromptClick,
+  onConfirmClick,
+  onOptionSelect,
+  showConfirmButtons,
+  currentPromptFlow,
+  suggestedPrompts = [],
+  currentChildOptions = []
+}) => {
+  const messagesEndRef = useRef(null);
+  const [websiteId, setWebsiteId] = useState('');
+  const [isWebsiteActive, setIsWebsiteActive] = useState(false);
+  const [lastClickedKeyword, setLastClickedKeyword] = useState(null);
+  const [showMainPrompts, setShowMainPrompts] = useState(true);
+  
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Reset prompts when flow is complete
+  useEffect(() => {
+    if (!currentPromptFlow) {
+      setShowMainPrompts(true);
+      setLastClickedKeyword(null);
+    } else if (currentPromptFlow.waitingForInput || showConfirmButtons) {
+      // Hide all prompts when waiting for user input or confirmation
+      setShowMainPrompts(false);
+    }
+  }, [currentPromptFlow, showConfirmButtons]);
+
+  // Fetch website ID
+  useEffect(() => {
+    const fetchWebsiteData = async () => {
+      if (!backendApiKey || !apiBaseUrl) {
+        console.warn('❌ Missing API configuration');
+        setIsWebsiteActive(false);
+        return;
+      }
+
+      try {
+       
+        
+        const response = await fetch(`${apiBaseUrl}/api/websites/chat-config?apiKey=${encodeURIComponent(backendApiKey)}`, {
+          method: 'GET',
+          headers: { 
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+       
+        
+        if (data.success && data.item) {
+          const websiteData = data.item;
+          
+          if (websiteData.status === 'active') {
+            setWebsiteId(websiteData.id || '');
+            setIsWebsiteActive(true);
+            
+          } else {
+            setWebsiteId('');
+            setIsWebsiteActive(false);
+           
+          }
+        } else {
+          setWebsiteId('');
+          setIsWebsiteActive(false);
+          console.warn('❌ No website found with this API key:', data.error);
+        }
+      } catch (error) {
+        console.error('💥 Error checking website status:', error);
+        setWebsiteId('');
+        setIsWebsiteActive(false);
+      }
+    };
+    
+    fetchWebsiteData();
+  }, [apiBaseUrl, backendApiKey]);
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+  };
+
+  const renderTicks = (status) => {
+    if (status === 'single')
+      return <Check size={14} color="#999" className={styles.tickIcon} />;
+    if (status === 'double')
+      return <CheckCheck size={14} color="#999" className={styles.tickIcon} />;
+    if (status === 'green')
+      return <CheckCheck size={14} color="#4caf50" className={styles.tickIcon} />;
+    return null;
+  };
+
+  const handleKeywordClick = (prompt) => {
+    setLastClickedKeyword(prompt);
+    setShowMainPrompts(false);
+    onPromptClick(prompt);
+  };
+
+  const handleOptionSelect = (option) => {
+    onOptionSelect(option);
+    // Don't show main prompts immediately after option selection
+    setShowMainPrompts(false);
+  };
+
+  const handleConfirmClick = (response) => {
+    onConfirmClick(response);
+    // After confirmation, check if we should show main prompts
+    if (response === 'Yes') {
+      // If user confirms, wait for next message/flow
+      setShowMainPrompts(false);
+    } else {
+      // If user cancels, show main prompts again
+      setShowMainPrompts(true);
+      setLastClickedKeyword(null);
+    }
+  };
+
+  // Show main prompts when:
+  // 1. No flow is active AND
+  // 2. Not waiting for confirmation AND
+  // 3. Not waiting for option selection AND
+  // 4. Not waiting for user input AND
+  // 5. Suggested prompts are available
+  const shouldShowMainPrompts = 
+    showMainPrompts && 
+    suggestedPrompts.length > 0 && 
+    !showConfirmButtons && 
+    !currentChildOptions.length && 
+    !isLoading &&
+    (!currentPromptFlow || (!currentPromptFlow.waitingForOption && !currentPromptFlow.isSingleChild));
+
+  // Show child options when available and not waiting for confirmation
+  // ONLY show if there are multiple children (more than 1)
+  const shouldShowChildOptions = 
+    currentChildOptions.length > 1 && 
+    !showConfirmButtons &&
+    currentPromptFlow &&
+    currentPromptFlow.waitingForOption;
+
+  return (
+    <div className={styles.chatBox}>
+      <div className={styles.messagesContainer}>
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            className={`${styles.chatMessage} ${msg.isAdmin ? styles.admin : styles.user}`}
+            style={{
+              backgroundColor: msg.isAdmin ? '#fff' : `${primaryColor}15`,
+              border: msg.isAdmin ? 'none' : `1px solid ${primaryColor}`,
+            }}
+          >
+            <div className={styles.messageRow}>
+              <div
+                className={styles.messageText}
+                dangerouslySetInnerHTML={{
+                  __html: msg.message.replace(/\n/g, '<br>'),
+                }}
+                style={{ 
+                  color: msg.isAdmin ? '#333' : primaryColor,
+                  whiteSpace: 'pre-line'
+                }}
+              />
+            </div>
+
+            {msg.isError && (
+              <div 
+                className={styles.errorMessage}
+                style={{ 
+                  color: secondaryColor,
+                  border: `1px solid ${secondaryColor}20`,
+                  backgroundColor: `${secondaryColor}10`
+                }}
+              >
+                ⚠️ {msg.message}
+              </div>
+            )}
+
+            <div className={styles.messageFooter}>
+              <span className={styles.messageTimestamp}>
+                {formatTime(msg.createdAt)}
+              </span>
+              {!msg.isAdmin && renderTicks(msg.status)}
+            </div>
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className={styles.typingIndicator}>
+            <div className={styles.typingDot} style={{ backgroundColor: secondaryColor }} />
+            <div className={styles.typingDot} style={{ backgroundColor: secondaryColor }} />
+            <div className={styles.typingDot} style={{ backgroundColor: secondaryColor }} />
+          </div>
+        )}
+
+        {/* Confirmation Buttons */}
+        {showConfirmButtons && (
+          <div className={styles.confirmContainer}>
+            <button
+              style={{ 
+                backgroundColor: primaryColor, 
+                color: 'white',
+                border: `1px solid ${primaryColor}`
+              }}
+              className={styles.confirmButton}
+              onClick={() => handleConfirmClick('Yes')}
+            >
+              ✅ Yes, Confirm
+            </button>
+            <button
+              style={{ 
+                backgroundColor: 'transparent', 
+                color: secondaryColor,
+                border: `1px solid ${secondaryColor}`
+              }}
+              className={styles.confirmButton}
+              onClick={() => handleConfirmClick('No')}
+            >
+              ❌ No, Cancel
+            </button>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Child options suggestions - SHOW ONLY WHEN MULTIPLE CHILDREN AVAILABLE AND WAITING FOR OPTION */}
+      {shouldShowChildOptions && (
+        <div className={styles.childOptionsContainer}>
+          <div className={styles.childOptionsHeader}>
+            <span style={{ color: primaryColor }}>📋 Available Options:</span>
+          </div>
+          <div className={styles.childOptionsList}>
+            {currentChildOptions.map((option, i) => (
+              <button
+                key={i}
+                className={styles.childOptionButton}
+                style={{ 
+                  backgroundColor: primaryColor, 
+                  color: 'white',
+                  border: `1px solid ${primaryColor}`
+                }}
+                onClick={() => handleOptionSelect(option)}
+                disabled={isLoading}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main suggested prompts - SHOW ONLY WHEN NO CHILD OPTIONS, NO CONFIRMATION, AND FLOW IS NOT WAITING FOR INPUT */}
+      {shouldShowMainPrompts && (
+        <div className={styles.keywordSuggestionsContainer}>
+          <div className={styles.keywordHeader}>
+            {/* You can add header text here if needed */}
+          </div>
+          <div className={styles.keywordList}>
+            {suggestedPrompts.map((prompt, i) => (
+              <button
+                key={i}
+                className={styles.keywordPill}
+                style={{ 
+                  backgroundColor: primaryColor, 
+                  color: 'white',
+                  border: `1px solid ${primaryColor}`
+                }}
+                onClick={() => handleKeywordClick(prompt)}
+                disabled={isLoading}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatBody;

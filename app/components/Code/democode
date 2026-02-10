@@ -1,0 +1,605 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { FaTimes, FaCopy, FaCode, FaCheckDouble, FaSave, FaExclamationTriangle, FaSpinner, FaEdit } from 'react-icons/fa';
+import styles from './CodePopup.module.css';
+import config from '../utils/config';
+
+const CodePopup = ({ website, onClose, onSaveSuccess }) => {
+  const [formData, setFormData] = useState({
+    superAdminUrl: '',
+    superAdminChatUrl: '',
+    integrationCode: ''
+  });
+  const [copiedField, setCopiedField] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [hasExistingConfig, setHasExistingConfig] = useState(false);
+  const [isDataChanged, setIsDataChanged] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  const API_BASE = config.apiBaseUrl;
+  const BASE_URL = config.baseUrl;
+
+  // Initialize form data with template URLs and integration code
+  const initializeFormData = () => {
+    if (website?.apiKey && !isInitialized) {
+      const superAdminUrl = `${BASE_URL}/Admin/AdminManagement/${website.apiKey}`;
+      const superAdminChatUrl = `${BASE_URL}/Chatpanel/AdminChatRequests/${website.apiKey}`;
+      const integrationCode = `<script
+  src="${BASE_URL}/widget.js"
+  data-app-id="${website.apiKey}"
+  async
+  defer
+></script>`;
+      
+      setFormData({
+        superAdminUrl,
+        superAdminChatUrl,
+        integrationCode
+      });
+      setIsInitialized(true);
+    }
+  };
+
+  // Fetch existing configuration when popup opens
+  useEffect(() => {
+    if (website?.apiKey) {
+      fetchConfig();
+    } else {
+      initializeFormData();
+    }
+  }, [website?.apiKey]);
+
+  useEffect(() => {
+    if (!hasExistingConfig && website?.apiKey) {
+      initializeFormData();
+    }
+  }, [hasExistingConfig, website?.apiKey]);
+
+  const fetchConfig = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await fetch(`${API_BASE}/code-config/${website.apiKey}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Configuration doesn't exist yet
+          console.log('No existing configuration found');
+          setHasExistingConfig(false);
+          initializeFormData();
+          return;
+        }
+        throw new Error(`Failed to fetch configuration: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // If URLs don't have the API key appended, append them
+        const superAdminUrl = result.data.superAdminUrl?.includes('/apiKey') 
+          ? result.data.superAdminUrl 
+          : `${BASE_URL}/Admin/AdminManagement/${website.apiKey}`;
+        
+        const superAdminChatUrl = result.data.superAdminChatUrl?.includes('/apiKey')
+          ? result.data.superAdminChatUrl
+          : `${BASE_URL}/Chatpanel/AdminChatRequests/${website.apiKey}`;
+        
+        const integrationCode = result.data.integrationCode?.includes('data-app-id="')
+          ? result.data.integrationCode
+          : `<script
+  src="${BASE_URL}/widget.js"
+  data-app-id="${website.apiKey}"
+  async
+  defer
+></script>`;
+        
+        setFormData({
+          superAdminUrl: result.data.superAdminUrl || superAdminUrl,
+          superAdminChatUrl: result.data.superAdminChatUrl || superAdminChatUrl,
+          integrationCode: result.data.integrationCode || integrationCode
+        });
+        setHasExistingConfig(true);
+      }
+    } catch (err) {
+      console.error('Error fetching configuration:', err);
+      setError('Failed to load existing configuration');
+      // Initialize with template data even on error
+      initializeFormData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    // If user clears the field, reinitialize with template
+    if (!value && !hasExistingConfig) {
+      if (name === 'superAdminUrl') {
+        setFormData(prev => ({
+          ...prev,
+          [name]: `${BASE_URL}/SuperAdmin/SuperAdminManagement/${website.apiKey}`
+        }));
+      } else if (name === 'superAdminChatUrl') {
+        setFormData(prev => ({
+          ...prev,
+          [name]: `${BASE_URL}/Chatpanel/AdminChatRequests/${website.apiKey}`
+        }));
+      } else if (name === 'integrationCode') {
+        setFormData(prev => ({
+          ...prev,
+          [name]: `<script
+  src="${BASE_URL}/widget.js"
+  data-app-id="${website.apiKey}"
+  async
+  defer
+></script>`
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+    
+    setIsDataChanged(true);
+    // Clear messages when user starts typing
+    if (error || success) {
+      setError('');
+      setSuccess('');
+    }
+  };
+
+  const handleCopyToClipboard = (text, fieldName) => {
+    if (!text) return;
+    
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    
+    setTimeout(() => {
+      setCopiedField(null);
+    }, 2000);
+  };
+
+  // Helper function to ensure URLs have the correct API key
+  const ensureApiKeyInUrls = (data) => {
+    const { apiKey } = website;
+    
+    let superAdminUrl = data.superAdminUrl;
+    let superAdminChatUrl = data.superAdminChatUrl;
+    
+    // Ensure superAdminUrl has API key
+    if (superAdminUrl && !superAdminUrl.includes(apiKey)) {
+      if (superAdminUrl.endsWith('/')) {
+        superAdminUrl = superAdminUrl.slice(0, -1);
+      }
+      superAdminUrl = `${superAdminUrl}/${apiKey}`;
+    }
+    
+    // Ensure superAdminChatUrl has API key
+    if (superAdminChatUrl && !superAdminChatUrl.includes(apiKey)) {
+      if (superAdminChatUrl.endsWith('/')) {
+        superAdminChatUrl = superAdminChatUrl.slice(0, -1);
+      }
+      superAdminChatUrl = `${superAdminChatUrl}/${apiKey}`;
+    }
+    
+    // Ensure integration code has the correct API key
+    let integrationCode = data.integrationCode;
+    const appIdRegex = /data-app-id="([^"]*)"/;
+    const match = integrationCode.match(appIdRegex);
+    
+    if (match && match[1] !== apiKey) {
+      integrationCode = integrationCode.replace(appIdRegex, `data-app-id="${apiKey}"`);
+    } else if (!match) {
+      // If no data-app-id found, add it
+      integrationCode = integrationCode.replace(
+        /<script([^>]*)>/,
+        `<script$1 data-app-id="${apiKey}">`
+      );
+    }
+    
+    return {
+      ...data,
+      superAdminUrl,
+      superAdminChatUrl,
+      integrationCode
+    };
+  };
+
+  const handleSave = async () => {
+    if (!website?.apiKey) {
+      setError('No API key available');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+
+      const configData = {
+        apiKey: website.apiKey,
+        websiteName: website.websiteName || 'Unknown Website',
+        superAdminUrl: formData.superAdminUrl,
+        superAdminChatUrl: formData.superAdminChatUrl,
+        integrationCode: formData.integrationCode
+      };
+
+      // Ensure API key is properly included in URLs and code
+      const validatedData = ensureApiKeyInUrls(configData);
+
+      const response = await fetch(`${API_BASE}/code-config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(validatedData)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to save configuration');
+      }
+
+      if (result.success) {
+        setSuccess('Configuration saved successfully!');
+        setHasExistingConfig(true);
+        setIsDataChanged(false);
+        
+        // Notify parent component about successful save
+        if (onSaveSuccess) {
+          onSaveSuccess(result.data);
+        }
+        
+        // Close popup after a short delay
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        throw new Error(result.message || 'Failed to save configuration');
+      }
+    } catch (err) {
+      console.error('Error saving configuration:', err);
+      setError(err.message || 'Failed to save configuration. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!website?.apiKey) {
+      setError('No API key available');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+
+      const updateData = {
+        superAdminUrl: formData.superAdminUrl,
+        superAdminChatUrl: formData.superAdminChatUrl,
+        integrationCode: formData.integrationCode
+      };
+
+      // Ensure API key is properly included in URLs and code
+      const validatedData = ensureApiKeyInUrls(updateData);
+
+      const response = await fetch(`${API_BASE}/code-config/${website.apiKey}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(validatedData)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update configuration');
+      }
+
+      if (result.success) {
+        setSuccess('Configuration updated successfully!');
+        setIsDataChanged(false);
+        
+        // Notify parent component about successful update
+        if (onSaveSuccess) {
+          onSaveSuccess(result.data);
+        }
+        
+        // Close popup after a short delay
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        throw new Error(result.message || 'Failed to update configuration');
+      }
+    } catch (err) {
+      console.error('Error updating configuration:', err);
+      setError(err.message || 'Failed to update configuration. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (hasExistingConfig) {
+      await handleUpdate();
+    } else {
+      await handleSave();
+    }
+  };
+
+  const handleResetToDefault = () => {
+    if (website?.apiKey) {
+      const superAdminUrl = `${BASE_URL}/Admin/AdminManagement/${website.apiKey}`;
+      const superAdminChatUrl = `${BASE_URL}/Chatpanel/AdminChatRequests/${website.apiKey}`;
+      const integrationCode = `<script
+  src="${BASE_URL}/widget.js"
+  data-app-id="${website.apiKey}"
+  async
+  defer
+></script>`;
+      
+      setFormData({
+        superAdminUrl,
+        superAdminChatUrl,
+        integrationCode
+      });
+      setIsDataChanged(true);
+      setError('');
+      setSuccess('');
+    }
+  };
+
+  const getButtonText = () => {
+    if (loading) {
+      return hasExistingConfig ? 'Updating...' : 'Saving...';
+    }
+    return hasExistingConfig ? 'Update Configuration' : 'Save Configuration';
+  };
+
+  const getButtonIcon = () => {
+    if (loading) {
+      return <FaSpinner className={styles.spinner} />;
+    }
+    return hasExistingConfig ? <FaEdit /> : <FaSave />;
+  };
+
+  if (!website) {
+    return null;
+  }
+
+  return (
+    <motion.div 
+      className={styles.codePopupOverlay}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div 
+        className={styles.codePopup}
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.codePopupHeader}>
+          <h2 className={styles.codePopupTitle}>
+            <FaCode className={styles.titleIcon} />
+            Code Configuration - {website.websiteName}
+            {hasExistingConfig && (
+              <span className={styles.configStatus}>Existing Configuration</span>
+            )}
+          </h2>
+          <motion.button 
+            className={styles.closeButton}
+            onClick={onClose}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            disabled={loading}
+          >
+            <FaTimes />
+          </motion.button>
+        </div>
+
+        <div className={styles.codePopupContent}>
+          {/* Status Messages */}
+          {error && (
+            <motion.div 
+              className={styles.errorMessage}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <FaExclamationTriangle className={styles.errorIcon} />
+              {error}
+            </motion.div>
+          )}
+
+          {success && (
+            <motion.div 
+              className={styles.successMessage}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <FaCheckDouble className={styles.successIcon} />
+              {success}
+            </motion.div>
+          )}
+
+          {/* API Key Display */}
+          <div className={styles.apiKeyDisplay}>
+            <label className={styles.apiKeyLabel}>API Key</label>
+            <div className={styles.apiKeyValue}>
+              <code>{website.apiKey}</code>
+              <motion.button
+                type="button"
+                className={`${styles.copyButton} ${copiedField === 'apiKey' ? styles.copied : ''}`}
+                onClick={() => handleCopyToClipboard(website.apiKey, 'apiKey')}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                disabled={loading}
+              >
+                {copiedField === 'apiKey' ? (
+                  <FaCheckDouble className={styles.checkIcon} />
+                ) : (
+                  <FaCopy />
+                )}
+                {copiedField === 'apiKey' ? 'Copied!' : 'Copy'}
+              </motion.button>
+            </div>
+            <small className={styles.apiKeyHint}>
+              Use this API key to authenticate requests from your website
+            </small>
+          </div>
+
+        
+          {/* Configuration Form */}
+          <div className={styles.formSection}>
+            <div className={styles.inputGroup}>
+              <label className={styles.inputLabel}>
+                 Admin URL
+                {formData.superAdminUrl && (
+                  <motion.button
+                    type="button"
+                    className={`${styles.fieldCopyButton} ${copiedField === 'superAdminUrl' ? styles.copied : ''}`}
+                    onClick={() => handleCopyToClipboard(formData.superAdminUrl, 'superAdminUrl')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    disabled={loading}
+                  >
+                    {copiedField === 'superAdminUrl' ? (
+                      <FaCheckDouble className={styles.checkIcon} />
+                    ) : (
+                      <FaCopy />
+                    )}
+                  </motion.button>
+                )}
+              </label>
+              <input
+                type="url"
+                name="superAdminUrl"
+                value={formData.superAdminUrl}
+                onChange={handleInputChange}
+                className={styles.textInput}
+                placeholder={`${BASE_URL}/Admin/AdminManagement/${website.apiKey}`}
+                disabled={loading}
+              />
+           
+            </div>
+
+            <div className={styles.inputGroup}>
+              <label className={styles.inputLabel}>
+                 Admin Chat Request URL
+                {formData.superAdminChatUrl && (
+                  <motion.button
+                    type="button"
+                    className={`${styles.fieldCopyButton} ${copiedField === 'superAdminChatUrl' ? styles.copied : ''}`}
+                    onClick={() => handleCopyToClipboard(formData.superAdminChatUrl, 'superAdminChatUrl')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    disabled={loading}
+                  >
+                    {copiedField === 'superAdminChatUrl' ? (
+                      <FaCheckDouble className={styles.checkIcon} />
+                    ) : (
+                      <FaCopy />
+                    )}
+                  </motion.button>
+                )}
+              </label>
+              <input
+                type="url"
+                name="superAdminChatUrl"
+                value={formData.superAdminChatUrl}
+                onChange={handleInputChange}
+                className={styles.textInput}
+                placeholder={`${BASE_URL}/Chatpanel/AdminChatRequests/${website.apiKey}`}
+                disabled={loading}
+              />
+           
+            </div>
+
+            <div className={styles.inputGroup}>
+              <label className={styles.inputLabel}>
+                Integration Code
+                {formData.integrationCode && (
+                  <motion.button
+                    type="button"
+                    className={`${styles.fieldCopyButton} ${copiedField === 'integrationCode' ? styles.copied : ''}`}
+                    onClick={() => handleCopyToClipboard(formData.integrationCode, 'integrationCode')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    disabled={loading}
+                  >
+                    {copiedField === 'integrationCode' ? (
+                      <FaCheckDouble className={styles.checkIcon} />
+                    ) : (
+                      <FaCopy />
+                    )}
+                  </motion.button>
+                )}
+              </label>
+              <textarea
+                name="integrationCode"
+                value={formData.integrationCode}
+                onChange={handleInputChange}
+                className={styles.codeTextarea}
+                placeholder={`<script
+  src="${BASE_URL}/widget.js"
+  data-app-id="${website.apiKey}"
+  async
+  defer
+></script>`}
+                rows="8"
+                disabled={loading}
+              />
+              <small className={styles.fieldHint}>
+                Default widget code for embedding on your website
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.codePopupFooter}>
+          <motion.button 
+            className={styles.cancelButton}
+            onClick={onClose}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            disabled={loading}
+          >
+            Cancel
+          </motion.button>
+          <motion.button 
+            className={`${styles.saveButton} ${hasExistingConfig ? styles.updateButton : ''}`}
+            onClick={handleSubmit}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            disabled={loading || (hasExistingConfig && !isDataChanged)}
+          >
+            {getButtonIcon()}
+            {getButtonText()}
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+export default CodePopup;

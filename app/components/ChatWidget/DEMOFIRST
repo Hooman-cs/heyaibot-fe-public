@@ -1,0 +1,1417 @@
+'use client';
+import { useState, useEffect, useRef } from 'react';
+import styles from './ChatWidget.module.css';
+import ChatHeader from '../ChatHeader/ChatHeader';
+import ChatBody from '../ChatBody/ChatBody';
+import ChatInput from '../ChatInput/ChatInput';
+import config from '../utils/config';
+
+const ChatWidget = ({
+  primaryColor = '#4a6baf',
+  secondaryColor = 'tomato',
+  widgetPosition = { right: '0px', bottom: '0px' },
+  chatWindowSize = { width: '340px', height: '470px' },
+  aiApiKey = config.aiApiKey,
+  backendApiKey = config.backendApiKey,
+  apiBaseUrl = config.apiBaseUrl,
+}) => {
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [systemPrompts, setSystemPrompts] = useState([]);
+  const [welcomeMessages, setWelcomeMessages] = useState([]);
+  const [websiteTitle, setWebsiteTitle] = useState('Support');
+  const [pendingQuestions, setPendingQuestions] = useState([]);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [activeConfig, setActiveConfig] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [currentPromptFlow, setCurrentPromptFlow] = useState(null);
+  const [collectedData, setCollectedData] = useState({}); // Original data with text keys
+  const [transformedDataForAPI, setTransformedDataForAPI] = useState({}); // Transformed data with parameter keys
+  const [suggestedPrompts, setSuggestedPrompts] = useState([]);
+  const [currentChildOptions, setCurrentChildOptions] = useState([]);
+  const [isWebsiteActive, setIsWebsiteActive] = useState(false);
+  const [websiteStatus, setWebsiteStatus] = useState('checking');
+  const [storedUrls, setStoredUrls] = useState([]);
+  const [storedApiKeys, setStoredApiKeys] = useState([]);
+  const [storedPromptsWithParams, setStoredPromptsWithParams] = useState([]);
+  const hasShownWelcome = useRef(false);
+const [selectedPromptName, setSelectedPromptName] = useState('');
+  // ✅ Fetch website configuration and welcome messages
+  const fetchWebsiteConfig = async () => {
+    if (!backendApiKey || !apiBaseUrl) {
+      console.warn('❌ Missing API configuration');
+      setWebsiteStatus('not_found');
+      setIsWebsiteActive(false);
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/websites/client-config?apiKey=${encodeURIComponent(backendApiKey)}`, {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.item) {
+        const websiteData = data.item;
+        setActiveConfig(websiteData);
+        setWebsiteTitle(websiteData.websiteName || 'Support');
+        setSystemPrompts(websiteData.systemPrompt || []);
+        setCategories(websiteData.category || []);;
+       
+        // Set suggested prompts from customPrompt
+        if (websiteData.customPrompt?.length > 0) {
+          setSuggestedPrompts(websiteData.customPrompt);
+        }
+       
+        return websiteData;
+      } else {
+        console.warn('❌ No website found with this API key:', data.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('💥 Error fetching website configuration:', error);
+      return null;
+    }
+  };
+
+  // ✅ Fetch welcome messages from backend
+  const fetchWelcomeMessages = async (websiteId) => {
+  if (!websiteId || !apiBaseUrl || !backendApiKey) return [];
+
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/api/websites/chat-config?apiKey=${backendApiKey}`
+    );
+
+    const data = await response.json();
+
+    if (data.success && data.item?.systemPrompt) {
+      return data.item.systemPrompt
+        .map(p => p.content)
+        .filter(msg => msg && msg.trim());
+    }
+
+    return [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+};
+
+
+  // ✅ Check website active status and fetch data
+  useEffect(() => {
+    const initializeChat = async () => {
+      const websiteData = await fetchWebsiteConfig();
+      
+      if (websiteData) {
+        // Check if website is active
+        if (websiteData.status === 'active') {
+          setWebsiteStatus('active');
+          setIsWebsiteActive(true);
+          setConnectionStatus('online');
+          
+          // Fetch welcome messages from backend
+          const backendWelcomeMessages = await fetchWelcomeMessages(websiteData.id);
+          setWelcomeMessages(backendWelcomeMessages);
+          
+          // Show welcome message
+          showWelcomeMessage(backendWelcomeMessages, websiteData);
+        } else {
+          setWebsiteStatus('inactive');
+          setIsWebsiteActive(false);
+          setConnectionStatus('offline');
+          console.warn('❌ Website found but status is inactive');
+          showServiceUnavailableMessage();
+        }
+      } else {
+        setWebsiteStatus('not_found');
+        setIsWebsiteActive(false);
+        setConnectionStatus('offline');
+        console.warn('❌ No website found with this API key');
+        showServiceUnavailableMessage();
+      }
+    };
+    
+    initializeChat();
+  }, [apiBaseUrl, backendApiKey]);
+
+  // ✅ Show welcome message
+  const showWelcomeMessage = (backendWelcomeMessages, websiteData) => {
+    if (hasShownWelcome.current) return;
+    
+    let welcomeMessage = '';
+    
+    // Priority 1: Use backend welcome messages if available
+    if (backendWelcomeMessages && backendWelcomeMessages.length > 0) {
+      const randomIndex = Math.floor(Math.random() * backendWelcomeMessages.length);
+      welcomeMessage = backendWelcomeMessages[randomIndex];
+    }
+    // Priority 2: Use system prompts from website config
+    else if (websiteData.systemPrompt && websiteData.systemPrompt.length > 0) {
+      const randomIndex = Math.floor(Math.random() * websiteData.systemPrompt.length);
+      welcomeMessage = websiteData.systemPrompt[randomIndex];
+    }
+    // Priority 3: Generate default welcome message based on categories
+    else {
+      welcomeMessage = websiteData.categories && websiteData.categories.length > 0
+        ? `Hi 👋 I'm your ${websiteData.websiteName || 'Support'} assistant. I specialize in ${websiteData.categories.join(', ')}. How can I help you today?`
+        : `Hi 👋 I'm your ${websiteData.websiteName || 'Support'} assistant. How can I help you today?`;
+    }
+    
+    setMessages([
+      {
+        sender: 'support-bot',
+        message: welcomeMessage,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      },
+    ]);
+    hasShownWelcome.current = true;
+  };
+
+  // ✅ Show service unavailable message
+  const showServiceUnavailableMessage = () => {
+    if (hasShownWelcome.current) return;
+    
+    setMessages([
+      {
+        sender: 'support-bot',
+        message: '❌ Service is currently unavailable. Please try again later.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      },
+    ]);
+    hasShownWelcome.current = true;
+  };
+
+  // ✅ Check backend connection (only if website is active)
+  useEffect(() => {
+    if (!isWebsiteActive) return;
+
+    const checkConnection = async () => {
+      try {
+        // Use the API key in the connection check
+        const res = await fetch(`${apiBaseUrl}/api/websites/header?apiKey=${encodeURIComponent(backendApiKey)}`, {
+          method: 'GET',
+          headers: { 
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          // Check if the response is successful and contains valid data
+          if (data.success) {
+            setConnectionStatus('online');
+          } else {
+            setConnectionStatus('offline');
+          }
+        } else {
+          setConnectionStatus('offline');
+        }
+      } catch {
+        setConnectionStatus('offline');
+      }
+    };
+    
+    checkConnection();
+    const interval = setInterval(checkConnection, 10000);
+    return () => clearInterval(interval);
+  }, [apiBaseUrl, isWebsiteActive, backendApiKey]);
+
+  // ✅ Function to transform data using promptsWithParams
+  const transformDataWithParams = (originalData, promptsWithParams) => {
+    if (!promptsWithParams || promptsWithParams.length === 0) {
+      return originalData;
+    }
+
+    const transformedData = {};
+    
+    // Create mapping from text to parameter key
+    const textToParamMap = {};
+    promptsWithParams.forEach(item => {
+      if (item.text && item.parameter && item.parameter.key) {
+        textToParamMap[item.text] = item.parameter.key;
+      }
+    });
+    
+    // Transform data
+    Object.entries(originalData).forEach(([textKey, value]) => {
+      const paramKey = textToParamMap[textKey] || textKey;
+      transformedData[paramKey] = value;
+    });
+    
+    return transformedData;
+  };
+
+  // ✅ Complete prompt flow and show confirmation
+  const completePromptFlow = (data) => {
+    // Transform data for API calls if promptsWithParams exist
+    let transformedData = {};
+    
+    if (storedPromptsWithParams && storedPromptsWithParams.length > 0) {
+      transformedData = transformDataWithParams(data, storedPromptsWithParams);
+    } else {
+      transformedData = { ...data };
+    }
+    
+    // Store both original and transformed data
+    setCollectedData(data); // Original data with text keys
+    setTransformedDataForAPI(transformedData); // Transformed data with parameter keys
+    
+    // Enhanced summary formatting with ORIGINAL keys (text keys)
+    let summary = "📋 Here's a summary of your details:\n";
+    let count = 1;
+
+    Object.entries(data).forEach(([key, value]) => {
+      summary += `${count}) *${key}* : ${value}\n`;
+      count++;
+    });
+    summary += "\nPlease confirm if all details are correct.";
+
+    const summaryMsg = {
+      sender: 'support-bot',
+      message: summary,
+      createdAt: new Date().toISOString(),
+      isAdmin: true,
+    };
+    setMessages((prev) => [...prev, summaryMsg]);
+
+    // Ask for confirmation
+    setTimeout(() => {
+      const confirmMsg = {
+        sender: 'support-bot',
+        message: 'All done! ✅ Would you like to confirm this request?',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      };
+      setMessages((prev) => [...prev, confirmMsg]);
+      setIsConfirming(true);
+      setCurrentPromptFlow(null);
+    }, 1000);
+  };
+
+  // ✅ Handle Confirm Response with URL API calls
+  const handleConfirmResponse = async (answer) => {
+    // Don't proceed if website is not active
+    if (!isWebsiteActive) {
+      const errorMsg = {
+        sender: 'support-bot',
+        message: '❌ Service is currently unavailable. Please try again later.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      return;
+    }
+
+    setIsConfirming(false);
+    setCurrentChildOptions([]);
+    
+    const userMsg = {
+      sender: 'user',
+      message: answer,
+      createdAt: new Date().toISOString(),
+      isAdmin: false,
+      status: 'green',
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    try {
+      if (answer === 'Yes') {
+        // Show saving message
+        const savingMsg = {
+          sender: 'support-bot',
+          message: '💾 Saving your request...',
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        };
+        setMessages((prev) => [...prev, savingMsg]);
+
+        // Check if we have URLs to call
+ const formData = new FormData();
+
+// ✅ REQUIRED: websiteId
+formData.append(
+  "websiteId",
+  activeConfig.websiteId || activeConfig.id
+);
+
+// ✅ Add promptName
+formData.append("promptName", selectedPromptName);
+
+// ✅ Dynamic payload (name, email, message, etc.)
+Object.entries(transformedDataForAPI).forEach(([key, value]) => {
+  if (value !== undefined && value !== null) {
+    formData.append(key, value);
+  }
+});
+
+// ✅ Send request (no headers needed for FormData)
+const execResponse = await fetch(`${apiBaseUrl}/api/execute-urls`, {
+  method: "POST",
+  body: formData
+});
+
+const execResult = await execResponse.json();
+const urlCallResults = execResult.results || [];
+
+
+
+        // Save to backend
+        const saveResponse = await fetch(`${apiBaseUrl}/api/chat-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${backendApiKey}`
+          },
+          body: JSON.stringify({
+            websiteId: activeConfig?.id,
+            collectedData: transformedDataForAPI,
+            originalData: collectedData,
+            backendApiKey: backendApiKey,
+            status: 'pending',
+            urlCallResults: urlCallResults.length > 0 ? urlCallResults : undefined
+          })
+        });
+
+        const saveResult = await saveResponse.json();
+
+        if (saveResult.success) {
+          // Remove saving message and show success
+          setMessages(prev => prev.filter(msg => msg.message !== '💾 Saving your request...'));
+          
+          let successMessage = '🎉 Great! Your request has been confirmed successfully and saved. We will contact you shortly.';
+          
+          const aiMsg = {
+            sender: 'support-bot',
+            message: successMessage,
+            createdAt: new Date().toISOString(),
+            isAdmin: true,
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+          
+        } else {
+          throw new Error(saveResult.message || 'Failed to save request');
+        }
+      } else {
+        // If user says No
+        const cancelResponse = await fetch(`${apiBaseUrl}/api/chat-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${backendApiKey}`
+          },
+          body: JSON.stringify({
+            websiteId: activeConfig?.id,
+            collectedData: transformedDataForAPI,
+            originalData: collectedData,
+            status: 'cancelled'
+          })
+        });
+
+        const cancelResult = await cancelResponse.json();
+        
+        const aiMsg = {
+          sender: 'support-bot',
+          message: '❌ No worries! Your request has been cancelled. You can update your request or try again later.',
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+      }
+    } catch (error) {
+      console.error('❌ Error saving chat request:', error);
+      
+      // Remove saving message if it exists
+      setMessages(prev => prev.filter(msg => msg.message !== '💾 Saving your request...'));
+      
+      const errorMsg = {
+        sender: 'support-bot',
+        message: '❌ There was an error processing your request. Please try again later.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      // Reset collected data and flow
+      setCollectedData({});
+      setTransformedDataForAPI({});
+      setCurrentPromptFlow(null);
+      setStoredUrls([]);
+      setStoredApiKeys([]);
+      setStoredPromptsWithParams([]);
+    }
+  };
+
+  // ✅ Generate AI Response - Only if website is active
+const generateAIResponse = async (question) => {
+  if (!isWebsiteActive) {
+    return {
+      response: '❌ Service is currently unavailable. Please try again later.'
+    };
+  }
+
+  try {
+    setIsLoading(true);
+    
+    // Call your Node.js backend API
+    const res = await fetch(
+      `${apiBaseUrl}/api/generate-ai-response`,
+      {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${backendApiKey}`
+        },
+        body: JSON.stringify({
+          question: question,
+          websiteTitle: websiteTitle,
+          categories: activeConfig?.category || []
+        })
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`API Error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    
+    if (data.success) {
+      return { response: data.response };
+    } else {
+      return { response: data.message || "Sorry, I couldn't generate a response." };
+    }
+  } catch (error) {
+    console.error('AI API Error:', error);
+    return { response: "Error processing request. Please try again later." };
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  // ✅ Handle Send Message - Check if website is active
+  const handleSendMessage = async (text) => {
+    if (!text.trim() || isLoading) return;
+
+    // Don't proceed if website is not active
+    if (!isWebsiteActive) {
+      const errorMsg = {
+        sender: 'support-bot',
+        message: '❌ Service is currently unavailable. Please try again later.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      return;
+    }
+
+    const userMsg = { 
+      sender: 'user', 
+      message: text, 
+      createdAt: new Date().toISOString(), 
+      isAdmin: false 
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setInputMessage('');
+
+    // Check if we're waiting for option selection (multiple children)
+    if (currentPromptFlow && currentPromptFlow.waitingForOption) {
+      handleOptionSelect(text);
+      return;
+    }
+
+    // Check if we're in a prompt flow (single child or direct question)
+    if (currentPromptFlow && currentPromptFlow.currentQuestion) {
+      handlePromptFlowResponse(text);
+      return;
+    }
+
+    if (pendingQuestions.length > 0 || isConfirming) {
+      setTimeout(() => handleNextQuestion(text), 800);
+      return;
+    }
+
+    setIsLoading(true);
+    const { response } = await generateAIResponse(text);
+    const botMsg = {
+      sender: 'support-bot',
+      message: response,
+      createdAt: new Date().toISOString(),
+      isAdmin: true,
+      status: 'green',
+    };
+    setMessages((prev) => [...prev, botMsg]);
+    setIsLoading(false);
+  };
+
+  // ✅ Handle Prompt Click - Check if website is active
+  const handlePromptClick = async (promptName) => {
+    // Don't proceed if website is not active
+    
+    if (!isWebsiteActive) {
+      const errorMsg = {
+        sender: 'support-bot',
+        message: '❌ Service is currently unavailable. Please try again later.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const childRes = await fetch(
+        `${apiBaseUrl}/api/childprompt/${activeConfig?.id}/${encodeURIComponent(promptName)}/filtered`,
+        { headers: { Authorization: `Bearer ${backendApiKey}` } }
+      );
+      const data = await childRes.json();
+
+      // Extract data from response
+    
+      const promptsWithParams = data.promptsWithParams || [];
+      setSelectedPromptName(promptName);
+      // Store URLs, API keys, and promptsWithParams in state
+    
+      setStoredPromptsWithParams(promptsWithParams);
+      
+      let prompts = [];
+      if (data.prompts) {
+        prompts = data.prompts;
+      } else if (data.items?.length) {
+        prompts = data.items.flatMap((item) => item.prompts);
+      }
+
+      setCollectedData({});
+      setTransformedDataForAPI({});
+      setCurrentChildOptions([]);
+
+      const userMsg = {
+        sender: 'user',
+        message: promptName,
+        createdAt: new Date().toISOString(),
+        isAdmin: false,
+        status: 'green',
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      const introMessage = categories.length > 0 
+        ? `Sure 😊! Let's ${promptName.toLowerCase()}. I'll help you with questions related to ${categories.join(', ')}.`
+        : `Sure 😊! Let's ${promptName.toLowerCase()}.`;
+
+      const aiIntro = {
+        sender: 'support-bot',
+        message: introMessage,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      };
+      setMessages((prev) => [...prev, aiIntro]);
+
+      if (prompts.length > 0) {
+        const firstPrompt = prompts[0];
+        
+        // Check if first prompt has children and if they're single or multiple
+        if (firstPrompt.children && firstPrompt.children.length > 0) {
+          if (firstPrompt.children.length === 1) {
+            // Single child: Ask directly via input
+            const singleChild = firstPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: 0,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false, // Not waiting for option, waiting for input
+              childOptions: null,
+              promptName: promptName,
+              isSingleChild: true
+            });
+
+            const explanationMsg = {
+              sender: 'support-bot',
+              message: `I'll guide you through the ${promptName.toLowerCase()} process step by step. Let's start!`,
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            };
+            setMessages((prev) => [...prev, explanationMsg]);
+
+            setTimeout(() => {
+              const aiMsg = {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+            }, 1000);
+          } else {
+            // Multiple children: Show as options
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: 0,
+              questionIndex: 0,
+              currentQuestion: firstPrompt,
+              waitingForOption: false, // Will show options
+              childOptions: firstPrompt.children,
+              promptName: promptName,
+              isSingleChild: false
+            });
+
+            const explanationMsg = {
+              sender: 'support-bot',
+              message: `I'll guide you through the ${promptName.toLowerCase()} process step by step. Let's start!`,
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            };
+            setMessages((prev) => [...prev, explanationMsg]);
+
+            setTimeout(() => {
+              const aiMsg = {
+                sender: 'support-bot',
+                message: makeFriendly(firstPrompt.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+
+              // Show options after a delay
+              setTimeout(() => {
+                showOptionsAfterQuestion(firstPrompt.children, prompts, 0);
+              }, 1000);
+            }, 1000);
+          }
+        } else {
+          // No children: Ask directly
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: 0,
+            questionIndex: 0,
+            currentQuestion: firstPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: promptName,
+            isSingleChild: false
+          });
+
+          const explanationMsg = {
+            sender: 'support-bot',
+            message: `I'll guide you through the ${promptName.toLowerCase()} process step by step. Let's start!`,
+            createdAt: new Date().toISOString(),
+            isAdmin: true,
+          };
+          setMessages((prev) => [...prev, explanationMsg]);
+
+          setTimeout(() => {
+            const aiMsg = {
+              sender: 'support-bot',
+              message: makeFriendly(firstPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            };
+            setMessages((prev) => [...prev, aiMsg]);
+          }, 1000);
+        }
+      } else {
+        const fallbackMsg = {
+          sender: 'support-bot',
+          message: `I'd be happy to help you with ${promptName.toLowerCase()}! Please tell me your requirements and I'll assist you.`,
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        };
+        setMessages((prev) => [...prev, fallbackMsg]);
+        setCurrentPromptFlow(null);
+      }
+    } catch (err) {
+      console.error('Error fetching prompts:', err);
+      
+      const userMsg = {
+        sender: 'user',
+        message: promptName,
+        createdAt: new Date().toISOString(),
+        isAdmin: false,
+        status: 'green',
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      const aiMsg = {
+        sender: 'support-bot',
+        message: `I'd be happy to help you with ${promptName.toLowerCase()}! Please tell me your requirements and I'll assist you.`,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+      setCurrentPromptFlow(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const makeFriendly = (text) => {
+    if (typeof text !== "string" || !text.trim()) {
+      return "Could you please provide some information?";
+    }
+    const phrases = [
+      `Could you please share ${text}?`,
+      `May I know ${text}?`,
+      `Please tell me ${text}`,
+      `I'd love to know ${text}`,
+    ];
+    return phrases[Math.floor(Math.random() * phrases.length)];
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhoneNumber = (phone) => {
+    // Remove all non-digit characters
+    const cleanedPhone = phone.replace(/\D/g, '');
+    
+    // Check if it's exactly 10 digits
+    const isValidLength = cleanedPhone.length === 10;
+    
+    // Check if it contains only digits
+    const isValidFormat = /^\d+$/.test(cleanedPhone);
+    
+    return isValidLength && isValidFormat;
+  };
+
+  const validateNumber = (number) => {
+    return !isNaN(number) && number.trim() !== '';
+  };
+
+  const validateDate = (date) => {
+    const dateStr = date.trim();
+    if (dateStr.includes(' to ')) {
+      const [startDate, endDate] = dateStr.split(' to ').map(d => d.trim());
+      return validateSingleDate(startDate) && validateSingleDate(endDate);
+    }
+    return validateSingleDate(dateStr);
+  };
+
+  const validateSingleDate = (dateStr) => {
+    const dateFormats = [
+      /^\d{1,2}-\d{1,2}-\d{4}$/,
+      /^\d{1,2}\/\d{1,2}\/\d{4}$/,
+      /^\d{4}-\d{1,2}-\d{1,2}$/
+    ];
+    const isValidFormat = dateFormats.some(format => format.test(dateStr));
+    if (!isValidFormat) return false;
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime()) && dateStr.trim() !== '';
+  };
+
+// Updated URL validation function
+const validateURL = (url) => {
+  const urlStr = url.trim();
+  if (urlStr === '') return false;
+  
+  // Enhanced URL patterns including localhost and ports
+  const urlPatterns = [
+    // Standard URLs
+    /^(https?:\/\/)?(www\.)?[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](\.[a-zA-Z]{2,})+(:\d{1,5})?(\/[a-zA-Z0-9-._~:?#@!$&'()*+,;=]*)?$/,
+    // Localhost URLs
+    /^(https?:\/\/)?localhost(:\d{1,5})?(\/[a-zA-Z0-9-._~:?#@!$&'()*+,;=]*)?$/,
+    // IP addresses
+    /^(https?:\/\/)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d{1,5})?(\/[a-zA-Z0-9-._~:?#@!$&'()*+,;=]*)?$/,
+    // Simple domains
+    /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/
+  ];
+  
+  // Try to match with patterns
+  const isValidFormat = urlPatterns.some(pattern => pattern.test(urlStr));
+  
+  if (isValidFormat) {
+    // Additional validation for IP addresses
+    if (urlStr.includes('http://') || urlStr.includes('https://') || urlStr.includes('.')) {
+      return true;
+    }
+    
+    // For non-http URLs, check if it looks like a domain
+    const parts = urlStr.split('.');
+    if (parts.length >= 2) {
+      const lastPart = parts[parts.length - 1];
+      // Check if last part looks like a TLD or port number
+      return /^[a-zA-Z]{2,}$/.test(lastPart) || /^\d{1,5}$/.test(lastPart.split(':')[1] || '');
+    }
+  }
+  
+  return false;
+};
+  const validateInput = (fieldType, value) => {
+    switch (fieldType) {
+      case 'email':
+        return validateEmail(value);
+      case 'number':
+        return validateNumber(value);
+      case 'phone':
+        return validatePhoneNumber(value);
+      case 'date':
+        return validateDate(value);
+         case 'url':
+      return validateURL(value);
+      default:
+        return value.trim() !== '';
+    }
+  };
+
+  const getFieldType = (text) => {
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('email') || lowerText.includes('e-mail')) return 'email';
+    if (lowerText.includes('phone') || lowerText.includes('mobile')) return 'phone';
+    if (lowerText.includes('number') || lowerText.includes('guest')) return 'number';
+    if (lowerText.includes('url') || lowerText.includes('website') || lowerText.includes('link') || lowerText.includes('web')) return 'url';
+    if (lowerText.includes('date') || lowerText.includes('stay') || lowerText.includes('check-in') || lowerText.includes('check-out')) return 'date';
+    return 'text';
+  };
+
+  const handlePromptFlowResponse = (userAnswer) => {
+    const { currentQuestion } = currentPromptFlow;
+    const fieldType = getFieldType(currentQuestion.text);
+
+    if (!validateInput(fieldType, userAnswer)) {
+      let errorMessage = '';
+      switch (fieldType) {
+        case 'email':
+          errorMessage = '📧 Please enter a valid email address (e.g., name@example.com)';
+          break;
+        case 'phone':
+          errorMessage = '📱 Please enter a valid 10-digit phone number';
+          break;
+        case 'number':
+          errorMessage = '🔢 Please enter a valid number';
+          break;
+        case 'date':
+          errorMessage = '📅 Please enter valid dates (e.g., "15-12-2024 to 20-12-2024" or "15/12/2024")';
+          break;
+          case 'url':
+        errorMessage = '🔗 Please enter a valid URL (e.g., http://localhost:3000/)';
+        break;
+        default:
+          errorMessage = '❌ Please provide a valid response';
+      }
+
+      const errorMsg = {
+        sender: 'support-bot',
+        message: errorMessage,
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      return;
+    }
+
+    const newCollectedData = {
+      ...collectedData,
+      [currentQuestion.text]: userAnswer
+    };
+    setCollectedData(newCollectedData);
+    moveToNextQuestion(newCollectedData);
+  };
+
+  const moveToNextQuestion = (data) => {
+    const { prompts, promptIndex, questionIndex } = currentPromptFlow;
+    const currentPrompt = prompts[promptIndex];
+    
+    // Check if we're in a single child scenario
+    if (currentPromptFlow.isSingleChild && questionIndex === 0) {
+      // Single child has been answered, move to next prompt
+      const nextPromptIndex = promptIndex + 1;
+      if (nextPromptIndex < prompts.length) {
+        const nextPrompt = prompts[nextPromptIndex];
+        
+        // Check if next prompt has children and if they're single or multiple
+        if (nextPrompt.children && nextPrompt.children.length > 0) {
+          if (nextPrompt.children.length === 1) {
+            // Single child: Ask directly
+            const singleChild = nextPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false,
+              childOptions: null,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: true
+            });
+
+            setTimeout(() => {
+              const aiMsg = {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+            }, 1000);
+          } else {
+            // Multiple children: Show as options
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: nextPrompt,
+              waitingForOption: false,
+              childOptions: nextPrompt.children,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: false
+            });
+
+            setTimeout(() => {
+              const aiMsg = {
+                sender: 'support-bot',
+                message: makeFriendly(nextPrompt.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+
+              // Show options after a delay
+              setTimeout(() => {
+                showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex);
+              }, 1000);
+            }, 1000);
+          }
+        } else {
+          // No children: Ask directly
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: nextPromptIndex,
+            questionIndex: 0,
+            currentQuestion: nextPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: currentPromptFlow.promptName,
+            isSingleChild: false
+          });
+
+          setTimeout(() => {
+            const aiMsg = {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            };
+            setMessages((prev) => [...prev, aiMsg]);
+          }, 1000);
+        }
+      } else {
+        completePromptFlow(data);
+      }
+      return;
+    }
+
+    // Original logic for non-single-child scenarios
+    if (currentPrompt.children && currentPrompt.children.length > 0 && questionIndex === 0) {
+      showOptionsAfterQuestion(currentPrompt.children, prompts, promptIndex);
+      return;
+    }
+
+    const nextQuestionIndex = questionIndex + 1;
+    
+    if (nextQuestionIndex < (currentPrompt.children?.length || 0)) {
+      const nextQuestion = currentPrompt.children[nextQuestionIndex];
+      setCurrentPromptFlow(prev => ({
+        ...prev,
+        questionIndex: nextQuestionIndex,
+        currentQuestion: nextQuestion
+      }));
+
+      const aiMsg = {
+        sender: 'support-bot',
+        message: makeFriendly(nextQuestion.text),
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } else {
+      const nextPromptIndex = promptIndex + 1;
+      if (nextPromptIndex < prompts.length) {
+        const nextPrompt = prompts[nextPromptIndex];
+        
+        // Check if next prompt has children and if they're single or multiple
+        if (nextPrompt.children && nextPrompt.children.length > 0) {
+          if (nextPrompt.children.length === 1) {
+            // Single child: Ask directly
+            const singleChild = nextPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false,
+              childOptions: null,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: true
+            });
+
+            setTimeout(() => {
+              const aiMsg = {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+            }, 1000);
+          } else {
+            // Multiple children: Set up for options
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: nextPrompt,
+              waitingForOption: false,
+              childOptions: nextPrompt.children,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: false
+            });
+
+            const aiMsg = {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            };
+            setMessages((prev) => [...prev, aiMsg]);
+
+            if (nextPrompt.children && nextPrompt.children.length > 0) {
+              setTimeout(() => {
+                showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex);
+              }, 1000);
+            }
+          }
+        } else {
+          // No children: Ask directly
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: nextPromptIndex,
+            questionIndex: 0,
+            currentQuestion: nextPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: currentPromptFlow.promptName,
+            isSingleChild: false
+          });
+
+          setTimeout(() => {
+            const aiMsg = {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            };
+            setMessages((prev) => [...prev, aiMsg]);
+          }, 1000);
+        }
+      } else {
+        completePromptFlow(data);
+      }
+    }
+  };
+
+  const showOptionsAfterQuestion = (children, prompts, promptIndex) => {
+    // Only show options if there are multiple children
+    if (children.length > 1) {
+      const optionsMessage = {
+        sender: 'support-bot',
+        message: 'Please choose one of the following options:',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      };
+      setMessages((prev) => [...prev, optionsMessage]);
+
+      setCurrentChildOptions(children.map(child => child.text));
+
+      setCurrentPromptFlow(prev => ({
+        ...prev,
+        waitingForOption: true,
+        childOptions: children,
+        currentQuestion: { text: 'Select Option' }
+      }));
+    } else if (children.length === 1) {
+      // Single child: Ask directly via input
+      const singleChild = children[0];
+      setCurrentPromptFlow(prev => ({
+        ...prev,
+        waitingForOption: false,
+        currentQuestion: singleChild,
+        isSingleChild: true
+      }));
+
+      setTimeout(() => {
+        const aiMsg = {
+          sender: 'support-bot',
+          message: makeFriendly(singleChild.text),
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+      }, 500);
+    }
+  };
+
+  const handleOptionSelect = (optionText) => {
+    const { prompts, promptIndex, childOptions } = currentPromptFlow;
+    
+    const selectedOption = childOptions.find(opt => opt.text === optionText);
+    
+    if (!selectedOption) {
+      const errorMsg = {
+        sender: 'support-bot',
+        message: '❌ Please select a valid option from the available choices.',
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      return;
+    }
+
+    const newCollectedData = {
+      ...collectedData,
+      [prompts[promptIndex].text]: optionText
+    };
+    setCollectedData(newCollectedData);
+    setCurrentChildOptions([]);
+
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage.isOptions) {
+      const userMsg = {
+        sender: 'user',
+        message: optionText,
+        createdAt: new Date().toISOString(),
+        isAdmin: false,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+    }
+
+    // Check if selected option has children
+    if (selectedOption.children && selectedOption.children.length > 0) {
+      // Check if children are single or multiple
+      if (selectedOption.children.length === 1) {
+        // Single child: Ask directly
+        const singleChild = selectedOption.children[0];
+        setCurrentPromptFlow(prev => ({
+          ...prev,
+          waitingForOption: false,
+          currentQuestion: singleChild,
+          isSingleChild: true
+        }));
+
+        setTimeout(() => {
+          const aiMsg = {
+            sender: 'support-bot',
+            message: makeFriendly(singleChild.text),
+            createdAt: new Date().toISOString(),
+            isAdmin: true,
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+        }, 500);
+      } else {
+        // Multiple children: Show options
+        setTimeout(() => {
+          showOptionsAfterQuestion(selectedOption.children, prompts, promptIndex);
+        }, 500);
+      }
+    } else {
+      // Selected option has no children, move to next prompt
+      const nextPromptIndex = promptIndex + 1;
+      if (nextPromptIndex < prompts.length) {
+        const nextPrompt = prompts[nextPromptIndex];
+        
+        // Check if next prompt has children and if they're single or multiple
+        if (nextPrompt.children && nextPrompt.children.length > 0) {
+          if (nextPrompt.children.length === 1) {
+            // Single child: Ask directly
+            const singleChild = nextPrompt.children[0];
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: singleChild,
+              waitingForOption: false,
+              childOptions: null,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: true
+            });
+
+            setTimeout(() => {
+              const aiMsg = {
+                sender: 'support-bot',
+                message: makeFriendly(singleChild.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+            }, 500);
+          } else {
+            // Multiple children: Set up for options
+            setCurrentPromptFlow({
+              prompts,
+              promptIndex: nextPromptIndex,
+              questionIndex: 0,
+              currentQuestion: nextPrompt,
+              waitingForOption: false,
+              childOptions: nextPrompt.children,
+              promptName: currentPromptFlow.promptName,
+              isSingleChild: false
+            });
+
+            setTimeout(() => {
+              const aiMsg = {
+                sender: 'support-bot',
+                message: makeFriendly(nextPrompt.text),
+                createdAt: new Date().toISOString(),
+                isAdmin: true,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+
+              if (nextPrompt.children && nextPrompt.children.length > 0) {
+                setTimeout(() => {
+                  showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex);
+                }, 1000);
+              }
+            }, 500);
+          }
+        } else {
+          // No children: Ask directly
+          setCurrentPromptFlow({
+            prompts,
+            promptIndex: nextPromptIndex,
+            questionIndex: 0,
+            currentQuestion: nextPrompt,
+            waitingForOption: false,
+            childOptions: null,
+            promptName: currentPromptFlow.promptName,
+            isSingleChild: false
+          });
+
+          setTimeout(() => {
+            const aiMsg = {
+              sender: 'support-bot',
+              message: makeFriendly(nextPrompt.text),
+              createdAt: new Date().toISOString(),
+              isAdmin: true,
+            };
+            setMessages((prev) => [...prev, aiMsg]);
+          }, 500);
+        }
+      } else {
+        completePromptFlow(newCollectedData);
+      }
+    }
+  };
+
+  const handleNextQuestion = (userAnswer = '') => {
+    if (pendingQuestions.length > 0) {
+      const [next, ...rest] = pendingQuestions;
+      setPendingQuestions(rest);
+      const aiMsg = {
+        sender: 'support-bot',
+        message: makeFriendly(next),
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } else if (!isConfirming && messages.length > 0) {
+      setTimeout(() => {
+        const confirmMsg = {
+          sender: 'support-bot',
+          message: 'All done! ✅ Would you like to confirm this request?',
+          createdAt: new Date().toISOString(),
+          isAdmin: true,
+        };
+        setMessages((prev) => [...prev, confirmMsg]);
+        setIsConfirming(true);
+      }, 700);
+    }
+  };
+
+  const handleCloseChat = () => {
+    setIsChatOpen(false);
+    setCurrentPromptFlow(null);
+    setCollectedData({});
+    setTransformedDataForAPI({});
+    setCurrentChildOptions([]);
+    setStoredUrls([]);
+    setStoredApiKeys([]);
+    setStoredPromptsWithParams([]);
+  };
+
+  const isInputDisabled = isLoading || isConfirming || 
+    (currentPromptFlow && currentPromptFlow.waitingForOption) || !isWebsiteActive;
+
+  return (
+    <div
+      className={styles.chatWidgetContainer}
+      style={{ right: widgetPosition.right, bottom: widgetPosition.bottom }}
+    >
+      {isChatOpen && (
+        <div
+          className={styles.chatWidgetWindow}
+          style={{
+            width: chatWindowSize.width,
+            height: chatWindowSize.height,
+          }}
+        >
+          <ChatHeader
+            secondaryColor={secondaryColor}
+            connectionStatus={connectionStatus}
+            onClose={handleCloseChat}
+            websiteTitle={websiteTitle}
+            apiBaseUrl={apiBaseUrl}
+            backendApiKey={backendApiKey}
+          />
+
+          <ChatBody
+            messages={messages}
+            isLoading={isLoading}
+            primaryColor={primaryColor}
+            secondaryColor={secondaryColor}
+            apiBaseUrl={apiBaseUrl}
+            backendApiKey={backendApiKey}
+            onPromptClick={handlePromptClick}
+            onConfirmClick={handleConfirmResponse}
+            onOptionSelect={handleOptionSelect}
+            showConfirmButtons={isConfirming}
+            currentPromptFlow={currentPromptFlow}
+            suggestedPrompts={suggestedPrompts}
+            currentChildOptions={currentChildOptions}
+          />
+
+          <ChatInput
+            inputMessage={inputMessage}
+            setInputMessage={setInputMessage}
+            sendMessage={handleSendMessage}
+            disabled={isInputDisabled}
+            primaryColor={primaryColor}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatWidget;
