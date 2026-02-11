@@ -4,13 +4,12 @@ import React from "react";
 import Link from "next/link";
 import Script from "next/script";
 import Navbar from '../app/Navbar'; // Import added
-import Footer from '../app/Footer'; // Import added
+import Footer from '../app/Footer';
 
 const ChatPage = () => {
   return (
     <>
-    <Navbar />
-    
+      <Navbar />
       <div className="bg-white">
         <section className="relative overflow-hidden bg-gray-50 py-20 sm:py-32">
           <div className="max-w-7xl mx-auto px-4 text-center">
@@ -53,7 +52,7 @@ const ChatPage = () => {
           </div>
         </section>
       </div>
-    <Footer />
+ <Footer />
       <Script
         src="https://www.heyaibot.com/widget.js"
         data-app-id="b9808aa0-863a-47be-8824-b3b7b37a09ce"

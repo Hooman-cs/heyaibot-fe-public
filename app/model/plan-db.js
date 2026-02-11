@@ -4,83 +4,156 @@ import { v4 as uuidv4 } from 'uuid';
 
 const PLANS_TABLE = "Plans";
 
+// 1. VIEW ALL PLANS
 export async function getAllPlans() {
-  const result = await docClient.send(new ScanCommand({ TableName: PLANS_TABLE }));
-  return result.Items || [];
+  try {
+    const result = await docClient.send(new ScanCommand({ TableName: PLANS_TABLE }));
+    // Sort by price (optional, but helpful)
+    return (result.Items || []).sort((a, b) => a.amount - b.amount);
+  } catch (error) {
+    console.error("Get All Plans Error:", error);
+    return [];
+  }
 }
 
+// 2. GET SINGLE PLAN
 export async function getPlanById(planId) {
-  const result = await docClient.send(new GetCommand({
-    TableName: PLANS_TABLE,
-    Key: { plan_id: planId }
-  }));
-  return result.Item;
+  try {
+    const { Item } = await docClient.send(new GetCommand({
+      TableName: PLANS_TABLE,
+      Key: { plan_id: planId }
+    }));
+    return Item;
+  } catch (error) {
+    console.error("Get Plan Error:", error);
+    return null;
+  }
 }
 
+// 3. CREATE PLAN (Now includes features object)
 export async function createPlan(planData) {
   const planId = uuidv4();
+  
   const newPlan = {
     plan_id: planId,
     plan_name: planData.name,
     amount: Number(planData.amount),
-    // NEW: Duration in days (Default to 30 if not provided)
-    duration: Number(planData.duration) || 30,
-    status: "active", // Default
+    duration: Number(planData.duration) || 30, // Default 30 days
+    
+    // ✅ NEW: Store features directly as an object { "Max Bots": "3", "Storage": "1GB" }
+    features: planData.features || {}, 
+    
+    status: "active", // Default status
     createdAt: new Date().toISOString(),
-    // Note: Features are NOT stored here anymore. They are in SaaSFeatures.
   };
 
-  await docClient.send(new PutCommand({
-    TableName: PLANS_TABLE,
-    Item: newPlan
-  }));
-  return newPlan;
+  try {
+    await docClient.send(new PutCommand({
+      TableName: PLANS_TABLE,
+      Item: newPlan
+    }));
+    return { success: true, planId };
+  } catch (error) {
+    console.error("Create Plan Error:", error);
+    return { success: false, error: error.message };
+  }
 }
 
-export async function updatePlanStatus(planId, status) {
-  await docClient.send(new UpdateCommand({
-    TableName: PLANS_TABLE,
-    Key: { plan_id: planId },
-    UpdateExpression: "set #s = :status",
-    ExpressionAttributeNames: { "#s": "status" },
-    ExpressionAttributeValues: { ":status": status }
-  }));
+// 4. UPDATE PLAN (Full Update: Name, Price, Features)
+export async function updatePlan(planId, data) {
+  try {
+    await docClient.send(new UpdateCommand({
+      TableName: PLANS_TABLE,
+      Key: { plan_id: planId },
+      UpdateExpression: "set plan_name = :n, amount = :a, duration = :d, features = :f",
+      ExpressionAttributeValues: {
+        ":n": data.name,
+        ":a": Number(data.amount),
+        ":d": Number(data.duration) || 30,
+        ":f": data.features || {} 
+      },
+      ReturnValues: "UPDATED_NEW"
+    }));
+    return { success: true };
+  } catch (error) {
+    console.error("Update Plan Error:", error);
+    return { success: false, error: error.message };
+  }
 }
 
+// 5. ENABLE / DISABLE PLAN (Soft Delete)
+export async function togglePlanStatus(planId, status) {
+  // status should be "active" or "inactive"
+  try {
+    await docClient.send(new UpdateCommand({
+      TableName: PLANS_TABLE,
+      Key: { plan_id: planId },
+      UpdateExpression: "set #s = :st",
+      ExpressionAttributeNames: { "#s": "status" }, // 'status' is a reserved word in DynamoDB
+      ExpressionAttributeValues: {
+        ":st": status 
+      },
+      ReturnValues: "UPDATED_NEW"
+    }));
+    return { success: true };
+  } catch (error) {
+    console.error("Toggle Plan Status Error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ⚠️ DELETE FUNCTION REMOVED as requested// import { docClient } from "./dynamodb";
 
 
+// import { ScanCommand, PutCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+// import { v4 as uuidv4 } from 'uuid';
 
-// import { docClient } from "./dynamodb";
-// import { ScanCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
-
-// const TABLE_NAME = "SaaSPlans";
+// const PLANS_TABLE = "Plans";
 
 // export async function getAllPlans() {
-//   const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }));
-//   // Sort by price usually makes sense
-//   return result.Items.sort((a, b) => a.price - b.price);
+//   const result = await docClient.send(new ScanCommand({ TableName: PLANS_TABLE }));
+//   return result.Items || [];
 // }
 
-// // NEW: Get single plan
-// export async function getPlanById(id) {
-//   const result = await docClient.send(new GetCommand({
-//     TableName: TABLE_NAME,
-//     Key: { id }
-//   }));
-//   return result.Item;
+// export async function getPlanById(planId) {
+//   try {
+//     const { Item } = await docClient.send(new GetCommand({
+//       TableName: PLANS_TABLE,
+//       Key: { plan_id: planId }
+//     }));
+//     return Item;
+//   } catch (error) {
+//     console.error("Get Plan Error:", error);
+//     return null;
+//   }
 // }
 
-// export async function createPlan(plan) {
+// export async function createPlan(planData) {
+//   const planId = uuidv4();
+//   const newPlan = {
+//     plan_id: planId,
+//     plan_name: planData.name,
+//     amount: Number(planData.amount),
+//     // NEW: Duration in days (Default to 30 if not provided)
+//     duration: Number(planData.duration) || 30,
+//     status: "active", // Default
+//     createdAt: new Date().toISOString(),
+//     // Note: Features are NOT stored here anymore. They are in SaaSFeatures.
+//   };
+
 //   await docClient.send(new PutCommand({
-//     TableName: TABLE_NAME,
-//     Item: plan
+//     TableName: PLANS_TABLE,
+//     Item: newPlan
 //   }));
-//   return plan;
+//   return newPlan;
 // }
 
-// export async function deletePlan(id) {
-//   await docClient.send(new DeleteCommand({
-//     TableName: TABLE_NAME,
-//     Key: { id }
+// export async function updatePlanStatus(planId, status) {
+//   await docClient.send(new UpdateCommand({
+//     TableName: PLANS_TABLE,
+//     Key: { plan_id: planId },
+//     UpdateExpression: "set #s = :status",
+//     ExpressionAttributeNames: { "#s": "status" },
+//     ExpressionAttributeValues: { ":status": status }
 //   }));
 // }

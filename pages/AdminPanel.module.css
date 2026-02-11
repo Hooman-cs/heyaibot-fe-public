@@ -40,7 +40,7 @@
   flex: 1;
   
   padding: 20px;
-  margin-top: 55px; /* adjust to header height */
+  margin-top: 40px; /* adjust to header height */
   scroll-behavior: smooth;
 }
 

@@ -1,133 +1,141 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "./auth/[...nextauth]";
+import { getToken } from "next-auth/jwt"; // Import this
 import crypto from "crypto";
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
-  const session = await getServerSession(req, res, authOptions);
+  try {
+    // 1. Try getting the token directly (Bypasses complex session callbacks)
+    const tokenData = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-  if (!session) {
-    return res.redirect("/login");
-  }
+    // Debugging Logs
+    console.log("1. Launch Studio hit");
+    console.log("2. Token Found:", tokenData ? "YES" : "NO");
 
-  // --- DUMMY PAYLOAD WITH HARDCODED VALUES ---
+    if (!tokenData) {
+      console.log("3. Debug: No Token. Cookies:", req.headers.cookie);
+      // Redirect to login if absolutely no token found
+      res.redirect("/login?error=SessionMissing");
+      return;
+    }
+
+    // 3. Dummy Payload
   const payload = JSON.stringify({
-    user_id: session.user.id,       // Keep dynamic so the user is identified correctly
-    email: session.user.email,      // Keep dynamic
-    name: session.user.name,        // Keep dynamic
-    
-    // Hardcoded Subscription Data
-    plan_id: "plan_premium_test",   
-    payment_id: "pay_mock_123456",
-    status: "active",               
-    
-    // Requested Field
-    maxBot: 3,                      
-
-    timestamp: Date.now()
+    userId: 'e6fc9edf-981a-4fe4-95a9-778f8d8dd217',
+    planId: 'e6fc6edf-981c-4fe8-85a9-778f8d8ad217',
+    plan: true,
+    maxBot: 3,
   });
 
-  const secret = process.env.NEXTAUTH_SECRET;
-  const token = Buffer.from(payload).toString('base64');
-  const signature = crypto.createHmac("sha256", secret).update(token).digest("hex");
+    // 4. Sign
+    const secret = process.env.NEXTAUTH_SECRET;
+    const tokenString = Buffer.from(payload).toString('base64');
+    const signature = crypto.createHmac("sha256", secret).update(tokenString).digest("hex");
 
-  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "https://dashboard.heyaibot.com"; 
-  
-  // Redirect with the token
-  res.redirect(`${chatbotUrl}/auth/sso?token=${token}&sig=${signature}`);
+    // 5. Redirect
+    res.redirect(`/AdminPanel?token=${tokenString}&sig=${signature}`);
+
+  } catch (error) {
+    console.error("Launch Studio Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 }
 
-// new code
-// // import { getServerSession } from "next-auth";
-// import { authOptions } from "./auth/[...nextauth]"; // Check this path matches your file structure
+
+// import { getServerSession } from "next-auth";
+// import { authOptions } from "./auth/[...nextauth]";
 // import crypto from "crypto";
-// import { getUserSubscription } from "@/lib/subscription-db";
 
 // export default async function handler(req, res) {
-//   if (req.method !== 'GET') return res.status(405).end();
+//   // 1. Check for GET method (Pages Router way)
+//   if (req.method !== 'GET') {
+//     return res.status(405).end();
+//   }
 
+//   // 2. Get Session
 //   const session = await getServerSession(req, res, authOptions);
 
 //   if (!session) {
 //     return res.redirect("/login");
 //   }
 
-//   // 1. Fetch the latest subscription
-//   // getUserSubscription should return the most recent active sub or null
-//   const sub = await getUserSubscription(session.user.id);
+//   // // 3. Create Dummy Payload
+//   // const payload = JSON.stringify({
+//   //   user_id: session.user.id,
+//   //   email: session.user.email,
+//   //   name: session.user.name,
+//   //   plan_id: "plan_premium_test",
+//   //   payment_id: "pay_mock_123456",
+//   //   status: "active",
+//   //   maxBot: 3, 
+//   //   timestamp: Date.now()
+//   // });
 
-//   // 2. Determine status
-//   // If sub exists and expire_date is in future => active. 
-//   // (Assuming getUserSubscription filters for 'active' status already, but safe to check date)
-//   let status = "expired";
-//   let planId = "none";
-//   let paymentId = null;
+//   // 3. Dummy Payload
+// //   const payload = JSON.stringify({
+// //     userId: 'e6fc9edf-981a-4fe4-95a9-778f8d8dd217',
+// //     planId: 'e6fc6edf-981c-4fe8-85a9-778f8d8ad217',
+// //     plan: true,
+// //     maxBot: 3,
+// //   });
 
-//   if (sub && sub.status === 'active') {
-//     const now = new Date();
-//     const expiry = new Date(sub.expire_date);
-//     if (expiry > now) {
-//       status = "active";
-//       planId = sub.plan_id;
-//       paymentId = sub.payment_id;
-//     }
-//   }
-
-//   // 3. Construct Payload
-//   const payload = JSON.stringify({
-//     user_id: session.user.id,
-//     email: session.user.email,
-//     plan_id: planId,          // "latest purchased plan_id"
-//     payment_id: paymentId,    // "payment_id"
-//     status: status,           // "active" or "expired"
-//     timestamp: Date.now()
-//   });
-
+//   // 4. Sign the Token
 //   const secret = process.env.NEXTAUTH_SECRET;
 //   const token = Buffer.from(payload).toString('base64');
 //   const signature = crypto.createHmac("sha256", secret).update(token).digest("hex");
 
-//   const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "https://dashboard.heyaibot.com"; 
-  
-//   res.redirect(`${chatbotUrl}/auth/sso?token=${token}&sig=${signature}`);
+//   // 5. Redirect to Local Admin Panel
+//   res.redirect(`/AdminPanel?token=${token}&sig=${signature}`);
 // }
 
 
 
+// import { NextResponse } from "next/server";
+// // import { getServerSession } from "next-auth";
+// import { getServerSession } from "next-auth/next";
 
-
-
-
-// old code
-// import { getServerSession } from "next-auth";
 // import { authOptions } from "../api/auth/[...nextauth]";
+// import { getUserSubscription } from "../../app/model/subscription-db";
 // import crypto from "crypto";
 
-// export default async function handler(req, res) {
-//   if (req.method !== 'GET') return res.status(405).end();
+// export async function GET(req) {
+//   const session = await getServerSession(authOptions);
+//   if (!session) return NextResponse.redirect(new URL("/", req.url));
 
-//   // Note: getServerSession requires (req, res, options) in Pages Router
-//   const session = await getServerSession(req, res, authOptions);
+//   // 1. Get Subscription (Checks expiration internally)
+//   const sub = await getUserSubscription(session.user.id);
 
-//   if (!session) {
-//     return res.redirect("/auth/login");
+//   // 2. Check Validity
+//   if (!sub || sub.status !== 'active') {
+//     // Redirect to pricing if no active sub
+//     return NextResponse.redirect(new URL("/pricing", req.url));
 //   }
 
+//   // // 3. Create Payload
+//   // const payload = JSON.stringify({
+//   //   userId: session.user.id,
+//   //   userEmail: session.user.email,
+//   //   isSuperAdmin: session.user.isSuperAdmin,
+//   //   planId: sub.plan_id,
+//   //   subscriptionId: sub.payment_id, // Chatbot uses this to fetch snapshot limits
+//   //   ts: Date.now()
+//   // });
+  
+//   // 3. Create Payload
 //   const payload = JSON.stringify({
-//     userId: session.user.id,
-//     email: session.user.email,
-//     name: session.user.name,
-//     plan: session.user.plan || "free",
-//     timestamp: Date.now()
+//     userId: 'e6fc9edf-981a-4fe4-95a9-778f8d8dd217',
+//     planId: 'e6fc6edf-981c-4fe8-85a9-778f8d8ad217',
+//     plan: true,
+//     maxBot: 3,
 //   });
 
+//   // 4. Sign & Redirect
 //   const secret = process.env.NEXTAUTH_SECRET;
 //   const token = Buffer.from(payload).toString('base64');
 //   const signature = crypto.createHmac("sha256", secret).update(token).digest("hex");
 
-//   const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "https://dashboard.heyaibot.com"; 
-  
-//   // Use res.redirect for server-side redirection
-//   res.redirect(`${chatbotUrl}/auth/sso?token=${token}&sig=${signature}`);
+//   // Temporarily hardcode this to ensure it stays local
+//   // const chatbotUrl = "/pages/AdminPanel.js"; 
+//   // return NextResponse.redirect(`${chatbotUrl}/api/debug?token=${token}&sig=${signature}`);
+//   res.redirect(`/AdminPanel?token=${token}&sig=${signature}`);
 // }

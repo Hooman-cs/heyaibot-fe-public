@@ -1,13 +1,22 @@
-import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import AzureADProvider from "next-auth/providers/azure-ad";
-import AppleProvider from "next-auth/providers/apple"; 
-import { getUserByEmail, createUser, getUserById } from "../../../app/model/user-db";
-import { getPlanById } from "../../../app/model/plan-db"; 
+import AppleProvider from "next-auth/providers/apple";
+import { getUserByEmail, createUser, getUserById } from "../../../app/model/user-db"; 
 import bcrypt from "bcryptjs";
+import NextAuth from "next-auth";
+import { getPlanById } from "../../../app/model/plan-db";
 
-// Helper function defined OUTSIDE the authOptions to prevent scope errors
+// import NextAuth from "next-auth";
+// import CredentialsProvider from "next-auth/providers/credentials";
+// import GoogleProvider from "next-auth/providers/google";
+// import AzureADProvider from "next-auth/providers/azure-ad";
+// import AppleProvider from "next-auth/providers/apple";
+// import { getUserByEmail, createUser, getUserById } from "@/lib/user-db"; 
+// import { getPlanById } from "@/lib/plan-db"; 
+// import bcrypt from "bcryptjs";
+
+// ✅ FIX 1: Define this helper function at the top level
 const enrichWithPlanName = async (planId) => {
   if (!planId || planId === 'none') return "None";
   try {
@@ -23,17 +32,17 @@ export const authOptions = {
   session: { strategy: "jwt" },
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     AzureADProvider({
-      clientId: process.env.MICROSOFT_CLIENT_ID,
-      clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+      clientId: process.env.MICROSOFT_CLIENT_ID || "",
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
       tenantId: process.env.MICROSOFT_TENANT_ID, 
     }),
     AppleProvider({
-      clientId: process.env.APPLE_ID,
-      clientSecret: process.env.APPLE_CLIENT_SECRET, 
+      clientId: process.env.APPLE_ID || "",
+      clientSecret: process.env.APPLE_CLIENT_SECRET || "", 
     }),
     CredentialsProvider({
       name: "Credentials",
@@ -47,8 +56,7 @@ export const authOptions = {
         const user = await getUserByEmail(credentials.email);
         if (!user) throw new Error("User not found");
         
-        // Allow passwordless users (social login) to link accounts if needed, 
-        // or strictly enforce social login.
+        // If user has no password (social login), block credentials login
         if (!user.password) throw new Error("Please use your social login");
 
         const isValid = await bcrypt.compare(credentials.password, user.password);
@@ -87,13 +95,12 @@ export const authOptions = {
           token.isSuperAdmin = dbUser.isSuperAdmin || false;
           token.name = dbUser.user_name;
           token.plan = dbUser.plan;
-          // Use the helper function defined at the top
+          // ✅ FIX 1: Now this function exists and won't crash
           token.planName = await enrichWithPlanName(dbUser.plan);
         }
       } 
       // 2. Subsequent Checks (Refetch to keep data fresh)
       else if (token.id) {
-        // We use try/catch here to prevent crashing if DB is unreachable
         try {
           const freshUser = await getUserById(token.id);
           if (freshUser) {
@@ -118,7 +125,6 @@ export const authOptions = {
       return session;
     }
   },
-  // UPDATED: Point to /login (where your page actually is)
   pages: { 
     signIn: "/login",
     error: "/login" 
@@ -128,14 +134,7 @@ export const authOptions = {
 
 export default NextAuth(authOptions);
 
-// import CredentialsProvider from "next-auth/providers/credentials";
-// import GoogleProvider from "next-auth/providers/google";
-// import AzureADProvider from "next-auth/providers/azure-ad";
-// import AppleProvider from "next-auth/providers/apple";
-// // FIX 1: Import getUserById
-// import { getUserByEmail, createUser, getUserById } from "../../../app/model/user-db"; 
-// import bcrypt from "bcryptjs";
-// import NextAuth from "next-auth";
+
 // export const authOptions = {
 //   session: { strategy: "jwt" },
 //   providers: [

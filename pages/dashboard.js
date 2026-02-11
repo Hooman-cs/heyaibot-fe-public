@@ -55,7 +55,7 @@ export default function Dashboard() {
           </a> */}
           <a 
             href="/api/launch-studio" 
-            target="_blank" 
+            target="_self" 
             className="w-full py-3 px-4 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-medium transition-all"
           >
             Launch Studio &rarr;
