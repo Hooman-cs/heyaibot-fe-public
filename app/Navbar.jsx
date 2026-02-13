@@ -5,7 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: session } = useSession(); // Access login state
+  const { data: session } = useSession(); 
 
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
@@ -95,55 +95,3 @@ export default function Navbar() {
 
 
 
-
-
-// "use client";
-// import Link from 'next/link';
-// import { useState } from 'react';
-
-// export default function Navbar() {
-//   const [isOpen, setIsOpen] = useState(false);
-
-//   return (
-//     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
-//       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//         <div className="flex justify-between h-16">
-//           <div className="flex">
-//             <Link href="/" className="flex-shrink-0 flex items-center font-bold text-2xl text-blue-600">
-//               HeyAiBot
-//             </Link>
-//           </div>
-          
-//           <div className="hidden sm:ml-6 sm:flex sm:space-x-8 items-center">
-//             <Link href="/" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Home</Link>
-//             <Link href="/features" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Features</Link>
-//             <Link href="/faq" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">FAQ</Link>
-//             <Link href="/contact" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Contact</Link>
-//             <button className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-//               Get Started
-//             </button>
-//           </div>
-          
-//           <div className="-mr-2 flex items-center sm:hidden">
-//             <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
-//               <span className="sr-only">Open main menu</span>
-//               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
-//               </svg>
-//             </button>
-//           </div>
-//         </div>
-//       </div>
-      
-//       {isOpen && (
-//         <div className="sm:hidden bg-white border-t">
-//           <div className="pt-2 pb-3 space-y-1">
-//             <Link href="/" className="block pl-3 pr-4 py-2 border-l-4 border-blue-500 text-base font-medium text-blue-700 bg-blue-50">Home</Link>
-//             <Link href="/features" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">Features</Link>
-//             <Link href="/contact" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">Contact</Link>
-//           </div>
-//         </div>
-//       )}
-//     </nav>
-//   );
-// }

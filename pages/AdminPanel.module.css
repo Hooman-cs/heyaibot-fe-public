@@ -1,409 +1,1190 @@
-/* Main Admin Panel Styles */
+/* ============================================
+   ADMIN PANEL MAIN STYLES - FIXED LAYOUT
+   ============================================ */
 
-.loading {
-  text-align: center;
-  font-size: 18px;
-  color: #2980b9;
-  margin: 20px 0;
+/* Main Container */
+.adminContainer {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+  overflow-x: hidden;
+  position: relative;
 }
 
-/* Fixed Header */
+/* Fixed Header - Calculate Total Height: Top + Bottom */
 .adminHeader {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  background: white;
-  z-index: 1000;
-  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  z-index: 999;
+  padding: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  height: auto; /* Changed to auto for dynamic height */
+  min-height: 160px; /* Minimum height */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header Top Section */
+.headerTop {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #eee;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  
-  margin: 0 auto;
+  padding: 16px 24px;
+  background: rgba(0, 0, 0, 0.1);
+  height: 80px; /* Fixed top section height */
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
-/* Scrollable Content Area */
-.adminContainer {
-  font-family: 'Arial', sans-serif;
-  margin: 0 auto;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  height: 97vh; /* Full viewport height */
-  /* overflow: hidden;  <-- remove this */
-}
-
-.adminContent {
+.headerLeft {
   flex: 1;
-  
-  padding: 20px;
-  margin-top: 40px; /* adjust to header height */
-  scroll-behavior: smooth;
+  min-width: 200px;
 }
 
-
-/* Rest of your existing styles... */
 .adminTitle {
-  color: #2c3e50;
-  font-size: 28px;
   margin: 0;
-  font-weight: 600;
-}
-
-.adminButtons {
+  font-size: 24px;
+  font-weight: 700;
   display: flex;
-  gap: 15px;
-}
-
-.adminButton {
-  
   align-items: center;
-  gap: 8px;
-  background-color: #4caf50;
-  color: white;
-  padding: 10px 18px;
-  font-size: 16px;
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  gap: 12px;
+  letter-spacing: 0.5px;
 }
 
-.adminButton:hover {
-  background-color: #45a049;
-  transform: translateY(-1px);
+.titleIcon {
+  font-size: 28px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+.websiteCount {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.headerSubtitle {
+  margin: 4px 0 0 0;
+  opacity: 0.9;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Header Right Section */
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.userProfile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 10px 16px;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.userProfile:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.profileIcon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .icon {
+  font-size: 20px;
+}
+
+.profileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.userStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusBadge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.statusBadge.active {
+  background: linear-gradient(135deg, #4CAF50, #8BC34A);
+  color: white;
+}
+
+.statusBadge.inactive {
+  background: linear-gradient(135deg, #FF9800, #FF5722);
+  color: white;
+}
+
+.usageBar {
+  width: 150px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.usageFill {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50, #8BC34A);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.usageText {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Logout Button - Fixed on Right */
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #ff4444, #cc0000);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.3);
+  letter-spacing: 0.5px;
+}
+
+.logoutButton:hover {
+  background: linear-gradient(135deg, #ff6666, #ff0000);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 68, 68, 0.4);
+}
+
+.logoutIcon {
   font-size: 18px;
 }
 
-.loadingText {
-  font-size: 1.1rem;
-  color: #555;
-  margin-bottom: 10px;
+.logoutText {
+  display: inline;
+}
+/* Header Bottom Section - Actions */
+.headerBottom {
+  padding: 16px 24px;
+  background: rgba(0, 0, 0, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  height: auto;
+  min-height: 80px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
+/* Action Buttons container */
+.actionButtons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
 
-.addNew {
-  background-color: #27ae60;
+/* Container for button + upgrade prompt */
+.buttonWithUpgrade {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Primary Button */
+.primaryButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
   color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  position: relative;
+  z-index: 2;
 }
 
-.addNew:hover {
-  background-color: #2ecc71;
+.primaryButton:hover:not(.disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+  background: linear-gradient(135deg, #45a049, #3d8b40);
 }
 
-.allList {
-  background-color: #3498db;
-  color: white;
+.primaryButton.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #9e9e9e, #757575);
+  box-shadow: 0 4px 12px rgba(158, 158, 158, 0.3);
 }
 
-.allList:hover {
-  background-color: #2980b9;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+/* Upgrade Prompt - Now positioned next to button */
+.upgradePrompt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #FF9800, #FF5722);
+  padding: 10px 16px;
+  border-radius: 8px;
+  animation: pulse 2s infinite;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  z-index: 1;
+  max-width: 250px;
+  white-space: nowrap;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* Connect button and upgrade prompt with a visual connector */
+.buttonWithUpgrade::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(100% - 20px);
+  transform: translateY(-50%);
+  width: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, #9e9e9e, #FF9800);
+  z-index: 0;
 }
 
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to { 
-    opacity: 1;
+.primaryButton:not(.disabled) + .upgradePrompt {
+  display: none;
+}
+
+@keyframes pulse {
+  0%, 100% { 
     transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
   }
+  50% { 
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(255, 152, 0, 0.4);
+  }
+}
+
+.upgradeIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% { 
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.1) rotate(10deg);
+    opacity: 0.8;
+  }
+}
+
+.upgradeText {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  line-height: 1.4;
+  
+}
+
+.upgradeLink {
+  background: none;
+  border: none;
+  color: white;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  margin-left: 2px;
+}
+
+.upgradeLink:hover {
+  color: #ffeb3b;
+  background: rgba(255, 255, 255, 0.1);
+  text-shadow: 0 0 8px rgba(255, 235, 59, 0.5);
+}
+
+/* Stats section */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.statsBox {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 10px 20px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.statNumber {
+  font-size: 22px;
+  font-weight: 800;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.statLabel {
+  font-size: 11px;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.statDivider {
+  opacity: 0.3;
+  font-weight: 300;
 }
 
 /* Responsive styles */
 @media (max-width: 768px) {
-  .adminHeader {
+  .buttonWithUpgrade {
     flex-direction: column;
     align-items: flex-start;
-    gap: 15px;
-    padding: 15px;
-  }
-  
-  .adminButtons {
+    gap: 10px;
     width: 100%;
-    justify-content: flex-end;
   }
   
-  .adminTitle {
-    font-size: 24px;
+  .buttonWithUpgrade::after {
+    display: none;
   }
   
-  .adminContent {
-    margin-top: 120px; /* More space for stacked header */
+  .primaryButton {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .upgradePrompt {
+    width: 100%;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+    justify-content: center;
+  }
+  
+  .actionButtons {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .headerActions {
+    width: 100%;
+    justify-content: center;
   }
 }
 
 @media (max-width: 480px) {
-  .adminButtons {
+  .statsBox {
+    flex-direction: column;
+    gap: 15px;
+    padding: 12px;
+    width: 100%;
+  }
+  
+  .statDivider {
+    display: none;
+  }
+  
+  .upgradeText {
+    font-size: 12px;
+  }
+  
+  .upgradeLink {
+    font-size: 12px;
+  }
+}
+
+/* Hover effect for the entire button-with-upgrade container */
+.buttonWithUpgrade:hover .upgradePrompt {
+  animation: bounce 0.5s ease;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+
+/* MAIN CONTENT AREA - Dynamic margin based on header height */
+.adminContent {
+  margin-top: 160px; /* DEFAULT HEADER HEIGHT without upgrade prompt */
+  padding: 30px;
+  min-height: calc(100vh - 160px);
+  box-sizing: border-box;
+  animation: fadeIn 0.5s ease;
+  overflow-y: auto;
+  background: white;
+  /* border-radius: 20px 20px 0 0; */
+  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
+  transition: margin-top 0.3s ease; /* Smooth transition when upgrade shows */
+}
+
+/* When upgrade prompt is shown, increase margin */
+.adminContent.withUpgrade {
+  margin-top: 200px; /* Increased margin when upgrade prompt is visible */
+  min-height: calc(100vh - 200px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading States */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px;
+  text-align: center;
+}
+
+.loadingSpinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(102, 126, 234, 0.1);
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty State - Shows in content area */
+.emptyState {
+  text-align: center;
+  padding: 80px 40px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  max-width: 600px;
+  margin: 40px auto;
+  border: 2px dashed #dee2e6;
+}
+
+.emptyStateIcon {
+  font-size: 80px;
+  margin-bottom: 30px;
+  opacity: 0.7;
+  animation: bounce 2s infinite;
+}
+
+.emptyStateTitle {
+  font-size: 28px;
+  color: #333;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.emptyStateText {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 30px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.emptyStateButton {
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.emptyStateButton:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* Messages - Shows below header but above content */
+.successMessage,
+.errorMessage {
+  position: fixed;
+  top: 170px; /* Below header */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  width: 90%;
+  max-width: 500px;
+  animation: slideDown 0.4s ease;
+}
+
+.successMessage {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+}
+
+.errorMessage {
+  background: linear-gradient(135deg, #FF9800, #FF5722);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: shake 0.5s ease;
+  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.3);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(-50%); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(calc(-50% - 5px)); }
+  20%, 40%, 60%, 80% { transform: translateX(calc(-50% + 5px)); }
+}
+
+.successIcon {
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.errorIcon {
+  font-size: 22px;
+}
+
+/* Modal Styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.3s ease;
+}
+
+.modalContent {
+  background: white;
+  padding: 32px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 450px;
+  width: 90%;
+  animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modalContent h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.modalContent p {
+  margin: 0 0 28px 0;
+  color: #666;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.modalButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+}
+
+.modalCancelButton {
+  padding: 12px 24px;
+  background: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.modalCancelButton:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+.modalConfirmButton {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #ff4444, #cc0000);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.3);
+}
+
+.modalConfirmButton:hover {
+  background: linear-gradient(135deg, #ff6666, #ff0000);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 68, 68, 0.4);
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Tablet (768px and below) */
+@media (max-width: 768px) {
+  .adminHeader {
+    min-height: 180px;
+  }
+  
+  .headerTop {
+    height: 80px;
+    padding: 14px 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .headerLeft {
+    text-align: center;
+  }
+  
+  .adminTitle {
+    justify-content: center;
+    font-size: 22px;
+  }
+  
+  .headerRight {
+    justify-content: space-between;
+    gap: 15px;
+  }
+  
+  .userProfile {
+    flex: 1;
+    padding: 10px 14px;
+  }
+  
+  .usageBar {
+    width: 120px;
+  }
+  
+  .logoutButton {
+    padding: 10px 16px;
+  }
+  
+  .logoutText {
+    display: none;
+  }
+  
+  .headerBottom {
+    padding: 14px 20px;
+    min-height: auto;
+    gap: 12px;
+  }
+  
+  .actionButtons {
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .primaryButton {
+    width: auto;
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .headerActions {
+    width: auto;
+    justify-content: flex-end;
+  }
+  
+  .statsBox {
+    width: auto;
+    justify-content: space-around;
+    padding: 8px 12px;
+    gap: 15px;
+  }
+  
+  .statNumber {
+    font-size: 18px;
+  }
+  
+  .statLabel {
+    font-size: 10px;
+  }
+  
+  .upgradePrompt {
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  
+  .upgradeIcon {
+    font-size: 18px;
+  }
+  
+  .upgradeText {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  
+  .upgradeLink {
+    font-size: 12px;
+    padding: 1px 4px;
+  }
+  
+  .adminContent {
+    margin-top: 180px;
+    min-height: calc(100vh - 180px);
+    padding: 20px;
+  }
+  
+  .adminContent.withUpgrade {
+    margin-top: 220px;
+    min-height: calc(100vh - 220px);
+  }
+  
+  .emptyState {
+    padding: 60px 30px;
+    margin: 20px auto;
+  }
+  
+  .emptyStateTitle {
+    font-size: 24px;
+  }
+  
+  .successMessage,
+  .errorMessage {
+    top: 190px;
+    width: 95%;
+  }
+  
+  .successMessage.withUpgrade,
+  .errorMessage.withUpgrade {
+    top: 230px;
+  }
+}
+
+/* Mobile (480px and below) */
+@media (max-width: 480px) {
+  .adminHeader {
+    min-height: 200px;
+  }
+  
+  .headerTop {
+    height: auto;
+    min-height: 100px;
+    padding: 12px 16px;
     flex-direction: column;
     gap: 10px;
   }
   
-  .adminButton {
+  .adminTitle {
+    font-size: 20px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .websiteCount {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+  
+  .headerRight {
+    flex-direction: row;
+    gap: 10px;
     width: 100%;
   }
-
+  
+  .userProfile {
+    width: auto;
+    flex-direction: row;
+    text-align: center;
+    padding: 10px 14px;
+    flex: 1;
+  }
+  
+  .profileInfo {
+    align-items: flex-start;
+  }
+  
+  .usageBar {
+    width: 100px;
+  }
+  
+  .logoutButton {
+    width: auto;
+    justify-content: center;
+    padding: 10px 14px;
+  }
+  
+  .logoutText {
+    display: none;
+  }
+  
+  .headerBottom {
+    padding: 12px 16px;
+    min-height: auto;
+    gap: 10px;
+  }
+  
+  .actionButtons {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  
+  .primaryButton {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .headerActions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .statsBox {
+    flex-direction: row;
+    gap: 15px;
+    padding: 12px;
+    width: 100%;
+    justify-content: space-around;
+  }
+  
+  .statDivider {
+    display: none;
+  }
+  
+  .upgradePrompt {
+    padding: 10px 14px;
+    gap: 8px;
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .upgradeIcon {
+    font-size: 16px;
+  }
+  
+  .upgradeText {
+    font-size: 11px;
+    line-height: 1.4;
+    text-align: center;
+  }
+  
+  .upgradeLink {
+    font-size: 11px;
+    margin-left: 3px;
+    padding: 0 3px;
+  }
   
   .adminContent {
-    padding: 15px;
-    margin-top: 72px; /* Even more space for mobile */
+    margin-top: 200px;
+    min-height: calc(100vh - 200px);
+    padding: 16px;
+    border-radius: 15px 15px 0 0;
+  }
+  
+  .adminContent.withUpgrade {
+    margin-top: 240px;
+    min-height: calc(100vh - 240px);
+  }
+  
+  .emptyState {
+    padding: 40px 20px;
+    margin: 10px auto;
+  }
+  
+  .emptyStateIcon {
+    font-size: 60px;
+  }
+  
+  .emptyStateTitle {
+    font-size: 22px;
+  }
+  
+  .modalContent {
+    padding: 24px;
+  }
+  
+  .modalButtons {
+    flex-direction: column;
+  }
+  
+  .modalCancelButton,
+  .modalConfirmButton {
+    width: 100%;
+  }
+  
+  .successMessage,
+  .errorMessage {
+    top: 210px;
+    width: 95%;
+    padding: 12px 16px;
+  }
+  
+  .successMessage.withUpgrade,
+  .errorMessage.withUpgrade {
+    top: 250px;
   }
 }
-.apiKeyInfo {
-  background: #e7f3ff;
-  padding: 8px 16px;
-  border-radius: 6px;
-  margin-bottom: 16px;
-  border-left: 4px solid #007bff;
-  font-size: 0.9rem;
-  color: #0056b3;
+
+/* Large Desktop (1400px and above) */
+@media (min-width: 1400px) {
+  .adminContent {
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 40px;
+    border-radius: 25px 25px 0 0;
+  }
+  
+  .adminContent.withUpgrade {
+    margin-top: 200px;
+    min-height: calc(100vh - 200px);
+  }
+  
+  .headerTop {
+    padding: 20px 32px;
+  }
+  
+  .adminTitle {
+    font-size: 28px;
+  }
+  
+  .headerBottom {
+    padding: 20px 32px;
+  }
+  
+  .upgradePrompt {
+    padding: 16px 24px;
+  }
+  
+  .upgradeText {
+    font-size: 15px;
+  }
 }
 
-.loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  text-align: center;
+/* Extra Small Mobile (360px and below) */
+@media (max-width: 360px) {
+  .adminHeader {
+    min-height: 220px;
+  }
+  
+  .adminTitle {
+    font-size: 18px;
+  }
+  
+  .headerSubtitle {
+    font-size: 12px;
+  }
+  
+  .logoutButton {
+    font-size: 13px;
+  }
+  
+  .primaryButton {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+  
+  .upgradePrompt {
+    padding: 8px 12px;
+  }
+  
+  .upgradeText {
+    font-size: 10px;
+  }
+  
+  .upgradeLink {
+    font-size: 10px;
+  }
+  
+  .adminContent {
+    margin-top: 220px;
+    min-height: calc(100vh - 220px);
+    padding: 12px;
+    border-radius: 10px 10px 0 0;
+  }
+  
+  .adminContent.withUpgrade {
+    margin-top: 260px;
+    min-height: calc(100vh - 260px);
+  }
+  
+  .successMessage,
+  .errorMessage {
+    top: 230px;
+  }
+  
+  .successMessage.withUpgrade,
+  .errorMessage.withUpgrade {
+    top: 270px;
+  }
 }
 
-.spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #007bff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+/* Print Styles */
+@media print {
+  .adminHeader,
+  .logoutButton,
+  .primaryButton,
+  .modalOverlay,
+  .upgradePrompt {
+    display: none !important;
+  }
+  
+  .adminContent {
+    margin-top: 0;
+    padding: 0;
+    min-height: auto;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  
+
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .adminContainer {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  }
+  
+  .adminContent {
+    background: #1e1e1e;
+    color: #ffffff;
+  }
+  
+  .emptyState {
+    background: #2d2d2d;
+    border-color: #404040;
+  }
+  
+  .emptyStateTitle {
+    color: #ffffff;
+  }
+  
+  .emptyStateText {
+    color: #cccccc;
+  }
 }
 
-.loadingDetails {
-  margin-top: 8px;
-  font-size: 0.8rem;
-  color: #6c757d;
+/* Scrollbar Styling */
+.adminContent::-webkit-scrollbar {
+  width: 8px;
 }
 
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 16px;
-  border-radius: 6px;
-  border: 1px solid #f5c6cb;
-  text-align: center;
+.adminContent::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
 }
 
-.errorDetails {
-  margin: 8px 0;
-  font-size: 0.8rem;
-  color: #856404;
+.adminContent::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
 }
 
-.retryButton {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-top: 8px;
+.adminContent::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
 }
 
-.retryButton:hover {
-  background: #c82333;
-}
-/* Page Not Found Styles */
-.notFoundContainer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 80vh;
-  padding: 40px 20px;
-  background: #f8f9fa;
-}
+/* Smooth Scrolling */
 
-.notFoundContent {
-  text-align: center;
-  max-width: 600px;
-  background: white;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e9ecef;
-}
-
-.notFoundIcon {
-  font-size: 4rem;
-  margin-bottom: 20px;
-}
-
-.notFoundContent h1 {
-  color: #495057;
-  margin-bottom: 16px;
-  font-size: 2rem;
-}
-
-.notFoundMessage {
-  color: #6c757d;
-  font-size: 1.1rem;
-  margin-bottom: 30px;
-  line-height: 1.6;
-}
-
-.notFoundDetails {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 30px;
-  text-align: left;
-}
-
-.notFoundDetails p {
-  margin: 8px 0;
-  color: #495057;
-}
-
-.notFoundActions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-}
-
-.retryButton {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.2s;
-}
-
-.retryButton:hover {
-  background: #0056b3;
-}
-
-.homeButton {
-  background: #6c757d;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.2s;
-}
-
-.homeButton:hover {
-  background: #545b62;
-}
-
-.troubleshooting {
-  text-align: left;
-  background: #fff3cd;
-  padding: 20px;
-  border-radius: 8px;
-  border-left: 4px solid #ffc107;
-}
-
-.troubleshooting h3 {
-  color: #856404;
-  margin-bottom: 12px;
-}
-
-.troubleshooting ul {
-  color: #856404;
-  margin: 0;
-  padding-left: 20px;
-}
-
-.troubleshooting li {
-  margin-bottom: 8px;
-  line-height: 1.4;
-}
-
-/* Loading Container Styles */
-.loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  padding: 40px;
-  text-align: center;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #007bff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 20px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.loadingDetails {
-  margin-top: 20px;
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 6px;
-  max-width: 400px;
-}
-
-.loadingDetails p {
-  margin: 5px 0;
-  color: #495057;
-}
-
-.errorText {
-  color: #dc3545 !important;
-  font-weight: bold;
-}
-
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 16px;
-  border-radius: 6px;
-  border: 1px solid #f5c6cb;
-  text-align: center;
-}
-
-.errorDetails {
-  margin: 8px 0;
-  font-size: 0.8rem;
-  color: #856404;
-}

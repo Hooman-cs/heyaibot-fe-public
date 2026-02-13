@@ -108,7 +108,7 @@ const [updatedWebsites, setUpdatedWebsites] = useState(websites);
         </motion.div>
       ) : (
         <>
-          <div className={styles.topBar}>
+          {/* <div className={styles.topBar}>
             <h2 className={styles.listTitle}>Website/App Management</h2>
             <div className={styles.statusSummary}>
               <span className={styles.activeCount}>
@@ -120,7 +120,7 @@ const [updatedWebsites, setUpdatedWebsites] = useState(websites);
                 Inactive: {inactiveCount}
               </span>
             </div>
-          </div>
+          </div> */}
 
           <ul className={styles.itemList}>
             {websites.map((website, index) => (

@@ -1,7 +1,13 @@
-import "./globals.css";
-import Providers from "./providers";
 
-export default function RootLayout({ children }) {
+import Providers from "./providers";
+import "./globals.css";
+import { ReactNode } from "react";  
+
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode; 
+}) {
   return (
     <html lang="en">
       <body>

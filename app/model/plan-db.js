@@ -65,7 +65,14 @@ export async function updatePlan(planId, data) {
     await docClient.send(new UpdateCommand({
       TableName: PLANS_TABLE,
       Key: { plan_id: planId },
-      UpdateExpression: "set plan_name = :n, amount = :a, duration = :d, features = :f",
+      // 1. Use alias #d instead of 'duration'
+      UpdateExpression: "set plan_name = :n, amount = :a, #d = :d, features = :f", 
+      
+      // 2. Define what #d means
+      ExpressionAttributeNames: {
+        "#d": "duration" 
+      },
+      
       ExpressionAttributeValues: {
         ":n": data.name,
         ":a": Number(data.amount),
@@ -80,6 +87,28 @@ export async function updatePlan(planId, data) {
     return { success: false, error: error.message };
   }
 }
+
+// export async function updatePlan(planId, data) {
+//   try {
+//     await docClient.send(new UpdateCommand({
+//       TableName: PLANS_TABLE,
+//       Key: { plan_id: planId },
+//       UpdateExpression: "set plan_name = :n, amount = :a, duration = :d, features = :f",
+//       ExpressionAttributeValues: {
+//         ":n": data.name,
+//         ":a": Number(data.amount),
+//         ":d": Number(data.duration) || 30,
+//         ":f": data.features || {} 
+//       },
+//       ReturnValues: "UPDATED_NEW"
+//     }));
+//     return { success: true };
+//   } catch (error) {
+//     console.error("Update Plan Error:", error);
+//     return { success: false, error: error.message };
+//   }
+// }
+
 
 // 5. ENABLE / DISABLE PLAN (Soft Delete)
 export async function togglePlanStatus(planId, status) {
@@ -101,59 +130,3 @@ export async function togglePlanStatus(planId, status) {
     return { success: false, error: error.message };
   }
 }
-
-// ⚠️ DELETE FUNCTION REMOVED as requested// import { docClient } from "./dynamodb";
-
-
-// import { ScanCommand, PutCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-// import { v4 as uuidv4 } from 'uuid';
-
-// const PLANS_TABLE = "Plans";
-
-// export async function getAllPlans() {
-//   const result = await docClient.send(new ScanCommand({ TableName: PLANS_TABLE }));
-//   return result.Items || [];
-// }
-
-// export async function getPlanById(planId) {
-//   try {
-//     const { Item } = await docClient.send(new GetCommand({
-//       TableName: PLANS_TABLE,
-//       Key: { plan_id: planId }
-//     }));
-//     return Item;
-//   } catch (error) {
-//     console.error("Get Plan Error:", error);
-//     return null;
-//   }
-// }
-
-// export async function createPlan(planData) {
-//   const planId = uuidv4();
-//   const newPlan = {
-//     plan_id: planId,
-//     plan_name: planData.name,
-//     amount: Number(planData.amount),
-//     // NEW: Duration in days (Default to 30 if not provided)
-//     duration: Number(planData.duration) || 30,
-//     status: "active", // Default
-//     createdAt: new Date().toISOString(),
-//     // Note: Features are NOT stored here anymore. They are in SaaSFeatures.
-//   };
-
-//   await docClient.send(new PutCommand({
-//     TableName: PLANS_TABLE,
-//     Item: newPlan
-//   }));
-//   return newPlan;
-// }
-
-// export async function updatePlanStatus(planId, status) {
-//   await docClient.send(new UpdateCommand({
-//     TableName: PLANS_TABLE,
-//     Key: { plan_id: planId },
-//     UpdateExpression: "set #s = :status",
-//     ExpressionAttributeNames: { "#s": "status" },
-//     ExpressionAttributeValues: { ":status": status }
-//   }));
-// }

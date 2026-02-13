@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import WebsiteConfig from '../app/components/superadminauthorform/index';
 import WebsiteList from '../app/components/superadminauthorlist/index';
-import styles from './AdminPanel.module.css';
+import styles from './superadminpanel.module.css';
 import config from '../app/components/utils/config';
 
 const API_URL = `${config.apiBaseUrl}/api/websites`;

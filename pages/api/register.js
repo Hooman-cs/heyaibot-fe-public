@@ -1,26 +1,65 @@
-import { createUser, getUserByEmail } from "../../app/model/user-db";
-import { NextResponse } from "next/server";
+import { createUser, getUserByEmail } from "../../app/model/user-db"; 
 
-export async function POST(request) {
+export default async function handler(req, res) {
+  // 1. Check for POST method
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
   try {
-    const { name, email, password } = await request.json();
+    // 2. Get Data (In Pages Router, req.body is already parsed)
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return NextResponse.json({ message: "Missing fields" }, { status: 400 });
+      return res.status(400).json({ message: "Missing fields" });
     }
 
+    // 3. Check if User Exists
     const existingUser = await getUserByEmail(email);
     if (existingUser) {
-      return NextResponse.json({ message: "User already exists" }, { status: 400 });
+      return res.status(400).json({ message: "User already exists" });
     }
 
+    // 4. Create User
     const result = await createUser({ name, email, password });
-    console.log("Create User Result:", result, name, email, password);
-    if (!result.success) throw new Error(result.error);
+    
+    if (!result.success) {
+      throw new Error(result.error);
+    }
 
-    return NextResponse.json({ message: "User registered" }, { status: 201 });
+    // 5. Success Response
+    return res.status(201).json({ message: "User registered successfully" });
+
   } catch (error) {
     console.error("Registration Error:", error);
-    return NextResponse.json({ message: "Error creating user" }, { status: 500 });
+    return res.status(500).json({ message: "Error creating user" });
   }
 }
+
+
+// import { createUser, getUserByEmail } from "../../app/model/user-db";
+// import { NextResponse } from "next/server";
+
+// export async function POST(request) {
+//   try {
+//     const { name, email, password } = await request.json();
+
+//     if (!name || !email || !password) {
+//       return NextResponse.json({ message: "Missing fields" }, { status: 400 });
+//     }
+
+//     const existingUser = await getUserByEmail(email);
+//     if (existingUser) {
+//       return NextResponse.json({ message: "User already exists" }, { status: 400 });
+//     }
+
+//     const result = await createUser({ name, email, password });
+//     console.log("Create User Result:", result, name, email, password);
+//     if (!result.success) throw new Error(result.error);
+
+//     return NextResponse.json({ message: "User registered" }, { status: 201 });
+//   } catch (error) {
+//     console.error("Registration Error:", error);
+//     return NextResponse.json({ message: "Error creating user" }, { status: 500 });
+//   }
+// }

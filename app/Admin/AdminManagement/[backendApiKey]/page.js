@@ -1,7 +1,7 @@
 // app/SuperAdmin/SuperAdminManagement/[backendApiKey]/page.js
 'use client';
 import { use } from 'react';
-import SuperAdmin from '../../../components/Admin';
+import SuperAdmin from '../../../../pages/AdminPanel';
 
 export default function SuperAdminPage({ params }) {
   const unwrappedParams = use(params);

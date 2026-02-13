@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import ReactDOM from 'react-dom'; // ✅ PORTAL
 import { FaTimes, FaCopy, FaCode, FaCheckDouble } from 'react-icons/fa';
 import styles from './CodePopup.module.css';
 import config from '../utils/config';
@@ -11,10 +12,32 @@ const CodePopup = ({ website, onClose }) => {
   });
   const [copiedField, setCopiedField] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const BASE_URL = config.baseUrl;
 
-  // Initialize form data with template URLs and integration code
+  useEffect(() => {
+    setMounted(true);
+    
+    if (website) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.body.style.top = '0';
+      document.body.style.left = '0';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.body.style.position = 'static';
+      document.body.style.width = 'auto';
+      document.body.style.height = 'auto';
+      document.body.style.top = 'auto';
+      document.body.style.left = 'auto';
+    };
+  }, [website]);
+
   const initializeFormData = () => {
     if (website?.apiKey && !isInitialized) {
       const superAdminChatUrl = `${BASE_URL}/Chatpanel/AdminChatRequests/${website.apiKey}`;
@@ -33,7 +56,6 @@ const CodePopup = ({ website, onClose }) => {
     }
   };
 
-  // Initialize when popup opens
   useEffect(() => {
     initializeFormData();
   }, [website?.apiKey]);
@@ -49,16 +71,21 @@ const CodePopup = ({ website, onClose }) => {
     }, 2000);
   };
 
-  if (!website) {
-    return null;
-  }
+  if (!website || !mounted) return null;
 
-  return (
+  // ✅ PORTAL - BODY MEIN RENDER
+  return ReactDOM.createPortal(
     <motion.div 
       className={styles.codePopupOverlay}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{ 
+        zIndex: 999999999, // SIRF Z-INDEX BADHAYA
+        position: 'fixed',
+        isolation: 'isolate'
+      }}
     >
       <motion.div 
         className={styles.codePopup}
@@ -66,6 +93,7 @@ const CodePopup = ({ website, onClose }) => {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
         onClick={(e) => e.stopPropagation()}
+        style={{ zIndex: 999999999 }}
       >
         <div className={styles.codePopupHeader}>
           <h2 className={styles.codePopupTitle}>
@@ -94,8 +122,6 @@ const CodePopup = ({ website, onClose }) => {
                     onClick={() => handleCopyToClipboard(formData.superAdminChatUrl, 'superAdminChatUrl')}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
                   >
                     {copiedField === 'superAdminChatUrl' ? (
                       <FaCheckDouble className={styles.checkIcon} />
@@ -120,8 +146,6 @@ const CodePopup = ({ website, onClose }) => {
                     onClick={() => handleCopyToClipboard(formData.integrationCode, 'integrationCode')}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
                   >
                     {copiedField === 'integrationCode' ? (
                       <FaCheckDouble className={styles.checkIcon} />
@@ -138,7 +162,8 @@ const CodePopup = ({ website, onClose }) => {
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body // ✅ BODY MEIN RENDER
   );
 };
 

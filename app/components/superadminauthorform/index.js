@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './AuthorForm.module.css';
-import ConfigForm from '../superadminleftcolumn/index';
+import ConfigForm from '../left-column-superadmin/index';
 import PreviewPanel from '../superadminrightcolumn/index';
 
 const WebsiteConfig = ({
