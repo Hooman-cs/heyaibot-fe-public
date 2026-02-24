@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import WebsiteConfig from '../app/components/AuthorForm';
 import WebsiteList from '../app/components/AuthorList';
@@ -7,6 +7,8 @@ import styles from './AdminPanel.module.css';
 import config from '../app/components/utils/config';
 
 const API_URL = `${config.apiBaseUrl}/api/websites`;
+const MAX_BOT_API_URL = '/api/user/max-bot';
+const SESSION_API_URL = '/api/auth/session';
 
 const AdminPanel = () => {
   const router = useRouter();
@@ -22,6 +24,15 @@ const AdminPanel = () => {
   const [authToken, setAuthToken] = useState(null);
   const [tokenExpiryTime, setTokenExpiryTime] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(null);
+  const [isTokenValidated, setIsTokenValidated] = useState(false);
+  const [tokenValidationAttempts, setTokenValidationAttempts] = useState(0);
+
+  // Refs to prevent multiple validations
+  const validationInProgress = useRef(false);
+  const tokenCheckedRef = useRef(false);
+  const expiryCheckInterval = useRef(null);
+  const apiCallInProgress = useRef(false);
+  const websitesFetched = useRef(false);
 
   const [configData, setConfigData] = useState({
     websiteName: '',
@@ -40,127 +51,292 @@ const AdminPanel = () => {
   const [tempRole, setTempRole] = useState('');
   const [tempRoleValue, setTempRoleValue] = useState('');
 
-  // Function to validate JWT token
-  const validateJWTToken = (token) => {
+  // ============ SESSION API CALL ============
+
+  const fetchSessionData = useCallback(async () => {
     try {
-      // Split JWT token into parts
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        console.error('Invalid JWT format');
+      const response = await fetch(SESSION_API_URL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        cache: 'no-store'
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return null;
+    }
+  }, []);
+
+  // ============ MAX BOT API CALL - हर 30 सेकंड में सिर्फ यही call होगी ============
+
+  const fetchMaxBotLimit = useCallback(async () => {
+    if (apiCallInProgress.current) return null;
+
+    try {
+      apiCallInProgress.current = true;
+      
+      const response = await fetch(MAX_BOT_API_URL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          sessionStorage.removeItem('adminAuthToken');
+          router.push('/login');
+          return null;
+        }
         return null;
       }
 
-      const [headerBase64, payloadBase64, signatureBase64] = parts;
+      const data = await response.json();
 
-      // Decode payload
-      let payload;
-      try {
-        const decodedPayload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
-        payload = decodedPayload;
-      } catch (e) {
-        console.error('Payload decode error:', e);
-        return null;
-      }
-
-      // Verify signature (optional but recommended)
-      if (process.env.NEXT_PUBLIC_VERIFY_TOKEN === 'true') {
-        const secret = process.env.NEXTAUTH_SECRET;
-        if (secret) {
-          const signatureInput = `${headerBase64}.${payloadBase64}`;
-          const expectedSignature = crypto
-            .createHmac('sha256', secret)
-            .update(signatureInput)
-            .digest('hex');
-          
-          if (signatureBase64 !== expectedSignature) {
-            console.error('Invalid signature');
-            return null;
-          }
+      // Session data भी ले लो planName के लिए
+      const sessionData = await fetchSessionData();
+      
+      // Session data से planName निकालो
+      let planName = 'Free Plan';
+      let hasPlan = false;
+      
+      if (sessionData && sessionData.user) {
+        if (sessionData.user.planName) {
+          planName = sessionData.user.planName;
+          hasPlan = true;
+        } else if (sessionData.user.plan) {
+          planName = 'Active Plan';
+          hasPlan = true;
         }
       }
 
-      return payload;
+      // Agar expired हो गया है (maxBot = 0 और expireDate है) तो तुरंत redirect करो
+      if (data.maxBot === 0 && data.expireDate) {
+        setError(`Your subscription expired on ${new Date(data.expireDate).toLocaleDateString()}`);
+        sessionStorage.removeItem('adminAuthToken');
+        localStorage.removeItem('adminAuthToken');
+        setTimeout(() => {
+          router.push('/login?expired=true');
+        }, 2000);
+        return data;
+      }
+
+      // Sirf maxBot update karo
+      setUserData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          maxBot: data.maxBot || 0,
+          plan: hasPlan,
+          planName: planName
+        };
+      });
+
+      return data;
+
     } catch (error) {
-      console.error('Token validation error:', error);
+      return null;
+    } finally {
+      apiCallInProgress.current = false;
+    }
+  }, [router, fetchSessionData]);
+
+  // ============ TOKEN VALIDATION FUNCTIONS ============
+
+  const validateTokenWithServer = useCallback(async (token) => {
+    if (!token) return null;
+    
+    try {
+      const response = await fetch('/api/verify-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+        cache: 'no-store'
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      
+      if (data.valid && data.payload) {
+        return data.payload;
+      }
+      return null;
+    } catch (error) {
       return null;
     }
-  };
+  }, []);
 
-  // Function to check token expiration
-  const isTokenExpired = (payload) => {
-    if (!payload || !payload.exp) {
-      console.error('No expiration in token');
-      return true;
-    }
-
-    const currentTime = Math.floor(Date.now() / 1000);
-    const isExpired = currentTime >= payload.exp;
-    
-    if (isExpired) {
-      console.log(`Token expired at: ${new Date(payload.exp * 1000).toLocaleString()}`);
-      console.log(`Current time: ${new Date().toLocaleString()}`);
-    }
-    
-    return isExpired;
-  };
-
-  // Function to parse and validate token from URL
-  const parseAndValidateToken = () => {
+  const extractToken = useCallback(() => {
     if (typeof window === 'undefined') return null;
     
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    let token = urlParams.get('token');
     
-    if (!token) {
-      console.error('No token found in URL');
-      return null;
+    if (token) {
+      sessionStorage.setItem('adminAuthToken', token);
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      return token;
     }
+    
+    token = sessionStorage.getItem('adminAuthToken');
+    if (token) return token;
+    
+    token = localStorage.getItem('adminAuthToken');
+    if (token) {
+      sessionStorage.setItem('adminAuthToken', token);
+      localStorage.removeItem('adminAuthToken');
+      return token;
+    }
+    
+    return null;
+  }, []);
+
+  const validateAndSetupToken = useCallback(async () => {
+    if (validationInProgress.current) return null;
 
     try {
-      // Validate JWT token
-      const payload = validateJWTToken(token);
+      validationInProgress.current = true;
+      
+      const token = extractToken();
+      if (!token) return null;
+
+      const payload = await validateTokenWithServer(token);
       
       if (!payload) {
-        console.error('Invalid token payload');
+        sessionStorage.removeItem('adminAuthToken');
         return null;
       }
 
-      // Check expiration
-      if (isTokenExpired(payload)) {
-        console.error('Token expired');
-        return null;
-      }
-
-      // Calculate time remaining
       const currentTime = Math.floor(Date.now() / 1000);
+      if (payload.exp && currentTime >= payload.exp) {
+        sessionStorage.removeItem('adminAuthToken');
+        return null;
+      }
+
       const remaining = payload.exp - currentTime;
-      
-      // Format remaining time
       const hours = Math.floor(remaining / 3600);
       const minutes = Math.floor((remaining % 3600) / 60);
+      const seconds = remaining % 60;
+
+      const sessionData = await fetchSessionData();
       
-      return {
-        userId: payload.userId,
+      let planName = 'Free Plan';
+      let hasPlan = false;
+      
+      if (sessionData && sessionData.user) {
+        if (sessionData.user.planName) {
+          planName = sessionData.user.planName;
+          hasPlan = true;
+        } else if (sessionData.user.plan) {
+          planName = 'Active Plan';
+          hasPlan = true;
+        }
+      }
+
+      const userDataObj = {
+        userId: payload.userId || payload.sub,
         planId: payload.planId,
-        plan: payload.plan,
-        maxBot: payload.maxBot,
+        plan: hasPlan,
+        planName: planName,
+        maxBot: 1,
         token: token,
         iat: payload.iat,
         exp: payload.exp,
         timeRemaining: {
           hours,
           minutes,
-          seconds: remaining % 60,
+          seconds,
           total: remaining
         }
       };
-    } catch (error) {
-      console.error('Token parsing error:', error);
-      return null;
-    }
-  };
 
-  // Update time remaining every second
+      return userDataObj;
+
+    } catch (error) {
+      return null;
+    } finally {
+      validationInProgress.current = false;
+    }
+  }, [extractToken, validateTokenWithServer, fetchSessionData]);
+
+  // ============ INITIAL SETUP ============
+
+  useEffect(() => {
+    let mounted = true;
+    
+    async function initializeAuth() {
+      if (tokenCheckedRef.current) return;
+      tokenCheckedRef.current = true;
+      
+      try {
+        setLoading(true);
+        
+        const userDataObj = await validateAndSetupToken();
+        
+        if (!mounted) return;
+        
+        if (!userDataObj) {
+          router.push('/login');
+          return;
+        }
+
+        setUserData(userDataObj);
+        setAuthToken(userDataObj.token);
+        setTokenExpiryTime(userDataObj.exp);
+        setTimeRemaining(userDataObj.timeRemaining);
+        setIsTokenValidated(true);
+
+        // पहली बार max bot API call
+        await fetchMaxBotLimit();
+        
+      } catch (error) {
+        if (mounted) router.push('/login');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router, validateAndSetupToken, fetchMaxBotLimit]);
+
+  // ============ SIRF MAX-BOT API HAR 30 SECOND MEIN CALL HOGA ============
+
+  useEffect(() => {
+    if (!authToken || !userData || !isTokenValidated) return;
+
+    // Clear existing interval
+    if (expiryCheckInterval.current) {
+      clearInterval(expiryCheckInterval.current);
+    }
+
+    // Sirf max-bot API har 30 second mein call hogi
+    expiryCheckInterval.current = setInterval(() => {
+      fetchMaxBotLimit();
+    }, 30000);
+
+    return () => {
+      if (expiryCheckInterval.current) {
+        clearInterval(expiryCheckInterval.current);
+      }
+    };
+  }, [authToken, userData, isTokenValidated, fetchMaxBotLimit]);
+
+  // ============ SESSION EXPIRY TIMER ============
+
   useEffect(() => {
     if (!userData || !userData.exp) return;
 
@@ -169,9 +345,9 @@ const AdminPanel = () => {
       const remaining = userData.exp - currentTime;
       
       if (remaining <= 0) {
-        // Token expired, redirect to login
         clearInterval(timer);
-        router.push('/login?error=SessionExpired');
+        sessionStorage.removeItem('adminAuthToken');
+        router.push('/login');
         return;
       }
 
@@ -186,7 +362,6 @@ const AdminPanel = () => {
         total: remaining
       });
 
-      // Show warning when 5 minutes remaining
       if (remaining <= 300 && remaining > 0) {
         setError(`⚠️ Your session will expire in ${minutes} minutes ${seconds} seconds. Please save your work.`);
       }
@@ -195,132 +370,67 @@ const AdminPanel = () => {
     return () => clearInterval(timer);
   }, [userData, router]);
 
-  // Clean URL by removing token parameters
-  const cleanUrl = () => {
-    if (typeof window === 'undefined') return;
-    
-    const url = new URL(window.location.href);
-    url.searchParams.delete('token');
-    window.history.replaceState({}, document.title, url.toString());
-  };
+  // ============ FETCH WEBSITES - SIRF EK BAAR ============
 
-  // Check token and get user data
-  useEffect(() => {
-    const tokenData = parseAndValidateToken();
-    
-    if (!tokenData) {
-      router.push('/login?error=SessionExpired');
+  const fetchUserItems = useCallback(async () => {
+    if (websitesFetched.current || !userData || !authToken || !isTokenValidated) {
       return;
     }
-
-    console.log('User Token Data:', tokenData);
-    console.log('Token expires:', new Date(tokenData.exp * 1000).toLocaleString());
-    console.log('Time remaining:', tokenData.timeRemaining);
-    
-    setUserData(tokenData);
-    setAuthToken(tokenData.token);
-    setTokenExpiryTime(tokenData.exp);
-    setTimeRemaining(tokenData.timeRemaining);
-    
-    // Clean URL after extracting token
-    cleanUrl();
-
-    // Set a timer to check token expiration periodically
-    const expirationCheck = setInterval(() => {
-      const currentTime = Math.floor(Date.now() / 1000);
-      if (currentTime >= tokenData.exp) {
-        console.log('Token expired during session');
-        clearInterval(expirationCheck);
-        router.push('/login?error=SessionExpired');
-      }
-    }, 10000); // Check every 10 seconds
-
-    return () => clearInterval(expirationCheck);
-  }, [router]);
-
-  // Fetch all websites for this user
-  const fetchUserItems = async () => {
-    if (!userData || !authToken) {
-      console.log('No user data or token, skipping fetch');
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    console.log('Fetching items for user:', userData.userId);
     
     try {
       const res = await fetch(`${API_URL}/user/${userData.userId}/websites`, {
         headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
       });
       
-      console.log('API Response Status:', res.status);
-      
-      if (res.status === 401) {
-        console.log('Unauthorized - redirecting to login');
-        router.push('/login?error=SessionExpired');
+      if (res.status === 401 || res.status === 403) {
+        sessionStorage.removeItem('adminAuthToken');
+        router.push('/login');
         return;
       }
 
-      if (res.status === 403) {
-        console.log('Forbidden - invalid token');
-        router.push('/login?error=InvalidToken');
-        return;
-      }
-      
       if (!res.ok) {
-        const errorText = await res.text();
-        console.log('API Error Response:', errorText);
-        throw new Error(`Failed to fetch data: ${res.status} ${res.statusText}`);
+        throw new Error(`Failed to fetch data: ${res.status}`);
       }
       
       const data = await res.json();
-      console.log('API Success Data:', data);
       
       if (!data.success) {
         throw new Error(data.error || 'API returned unsuccessful response');
       }
       
       const itemsArray = data.items || data.data || [];
-      console.log('Processed Items Array:', itemsArray);
       
-      const processedItems = itemsArray.map(item => {
-        return {
-          ...item,
-          roles: item.role || [],
-          aifuture: item.aifuture || []
-        };
-      });
+      const processedItems = itemsArray.map(item => ({
+        ...item,
+        roles: item.role || item.roles || [],
+        aifuture: item.aifuture || []
+      }));
       
-      console.log('Final Processed Items:', processedItems);
       setItems(processedItems);
-      
       setShowForm(processedItems.length === 0);
+      websitesFetched.current = true;
       
     } catch (err) {
-      console.log('Fetch Error:', err);
       if (err.message.includes('401') || err.message.includes('403')) {
-        router.push('/login?error=SessionExpired');
+        router.push('/login');
       } else {
         setError(err.message || 'Failed to fetch data');
       }
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [userData, authToken, isTokenValidated, router]);
 
-  // Fetch items when userData changes
+  // Fetch items when userData is available - sirf ek baar
   useEffect(() => {
-    if (userData && authToken) {
-      console.log('User data and token available, fetching items');
+    if (userData && authToken && isTokenValidated && !websitesFetched.current) {
       fetchUserItems();
-    } else {
-      console.log('No user data or token yet');
     }
-  }, [userData, authToken]);
+  }, [userData, authToken, isTokenValidated, fetchUserItems]);
+
+  // ============ FORM FUNCTIONS ============
 
   const resetForm = () => {
     setConfigData({
@@ -342,9 +452,18 @@ const AdminPanel = () => {
   };
 
   const handleAddNew = () => {
-    // Check if token is still valid
+    if (!authToken || !userData || !isTokenValidated) {
+      router.push('/login');
+      return;
+    }
+    
     if (timeRemaining && timeRemaining.total <= 0) {
-      router.push('/login?error=SessionExpired');
+      router.push('/login');
+      return;
+    }
+
+    if (items.length >= userData.maxBot) {
+      setError(`You have reached your limit of ${userData.maxBot} websites. Please upgrade your plan.`);
       return;
     }
     
@@ -357,17 +476,18 @@ const AdminPanel = () => {
     setShowForm(false);
   };
 
+  // ============ SUBMIT HANDLER ============
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Check if token is still valid
-    if (timeRemaining && timeRemaining.total <= 0) {
-      router.push('/login?error=SessionExpired');
+    if (!authToken || !userData || !isTokenValidated) {
+      router.push('/login');
       return;
     }
 
-    if (!userData || !authToken) {
-      router.push('/login?error=SessionExpired');
+    if (timeRemaining && timeRemaining.total <= 0) {
+      router.push('/login');
       return;
     }
 
@@ -392,8 +512,6 @@ const AdminPanel = () => {
       userId: userData.userId
     };
 
-    console.log('Submit Payload:', payload);
-
     try {
       let url, method;
       
@@ -405,9 +523,6 @@ const AdminPanel = () => {
         method = 'POST';
       }
       
-      console.log('API URL:', url);
-      console.log('API Method:', method);
-      
       const res = await fetch(url, {
         method,
         headers: { 
@@ -417,44 +532,31 @@ const AdminPanel = () => {
         body: JSON.stringify(payload),
       });
 
-      console.log('Save Response Status:', res.status);
-      
-      if (res.status === 401) {
-        console.log('Unauthorized - redirecting to login');
-        router.push('/login?error=SessionExpired');
-        return;
-      }
-
-      if (res.status === 403) {
-        console.log('Forbidden - invalid token');
-        router.push('/login?error=InvalidToken');
+      if (res.status === 401 || res.status === 403) {
+        sessionStorage.removeItem('adminAuthToken');
+        router.push('/login');
         return;
       }
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        console.log('Save Error Data:', errorData);
-        throw new Error(errorData.error || `Failed to save: ${res.status} ${res.statusText}`);
+        throw new Error(errorData.error || `Failed to save: ${res.status}`);
       }
 
-      const responseData = await res.json();
-      console.log('Save Success Data:', responseData);
+      await res.json();
       
-      setShowSuccessMessage(editingId ? 'Website updated successfully!' : 'Website created successfully!');
+      setShowSuccessMessage(editingId ? '✅ Website updated successfully!' : '✅ Website created successfully!');
       
-      setTimeout(() => {
-        setShowSuccessMessage('');
-      }, 3000);
+      setTimeout(() => setShowSuccessMessage(''), 3000);
       
+      websitesFetched.current = false;
       await fetchUserItems();
-      
       resetForm();
       setShowForm(false);
   
     } catch (err) {
-      console.log('Submit Error:', err);
       if (err.message.includes('401') || err.message.includes('403')) {
-        router.push('/login?error=SessionExpired');
+        router.push('/login');
       } else {
         setError(err.message || 'Error saving data');
       }
@@ -463,15 +565,16 @@ const AdminPanel = () => {
     }
   };
 
+  // ============ STATUS CHANGE HANDLER ============
+
   const handleStatusChange = async (id, newStatus) => {
-    // Check if token is still valid
-    if (timeRemaining && timeRemaining.total <= 0) {
-      router.push('/login?error=SessionExpired');
+    if (!authToken || !userData || !isTokenValidated) {
+      router.push('/login');
       return;
     }
 
-    if (!userData || !authToken) {
-      router.push('/login?error=SessionExpired');
+    if (timeRemaining && timeRemaining.total <= 0) {
+      router.push('/login');
       return;
     }
     
@@ -487,13 +590,9 @@ const AdminPanel = () => {
         body: JSON.stringify(payload),
       });
 
-      if (res.status === 401) {
-        router.push('/login?error=SessionExpired');
-        return;
-      }
-
-      if (res.status === 403) {
-        router.push('/login?error=InvalidToken');
+      if (res.status === 401 || res.status === 403) {
+        sessionStorage.removeItem('adminAuthToken');
+        router.push('/login');
         return;
       }
 
@@ -508,23 +607,28 @@ const AdminPanel = () => {
         )
       );
       
-      setShowSuccessMessage(`Status updated to ${newStatus}`);
+      setShowSuccessMessage(`✅ Status updated to ${newStatus}`);
       setTimeout(() => setShowSuccessMessage(''), 2000);
       
     } catch (err) {
       if (err.message.includes('401') || err.message.includes('403')) {
-        router.push('/login?error=SessionExpired');
+        router.push('/login');
       } else {
-        console.error('Status update error:', err);
         setError(err.message || 'Error updating status');
       }
     }
   };
 
+  // ============ EDIT HANDLER ============
+
   const handleEdit = (id) => {
-    // Check if token is still valid
+    if (!authToken || !userData || !isTokenValidated) {
+      router.push('/login');
+      return;
+    }
+
     if (timeRemaining && timeRemaining.total <= 0) {
-      router.push('/login?error=SessionExpired');
+      router.push('/login');
       return;
     }
 
@@ -546,19 +650,18 @@ const AdminPanel = () => {
     }
   };
 
+  // ============ DELETE HANDLER ============
+
   const handleDelete = async (id) => {
-    // Check if token is still valid
-    if (timeRemaining && timeRemaining.total <= 0) {
-      router.push('/login?error=SessionExpired');
+    if (!authToken || !userData || !isTokenValidated) {
+      router.push('/login');
       return;
     }
 
-    if (!userData || !authToken) {
-      router.push('/login?error=SessionExpired');
+    if (timeRemaining && timeRemaining.total <= 0) {
+      router.push('/login');
       return;
     }
-    
-   
     
     try {
       const res = await fetch(`${API_URL}/user/${userData.userId}/websites/${id}`, { 
@@ -568,22 +671,17 @@ const AdminPanel = () => {
         }
       });
 
-      if (res.status === 401) {
-        router.push('/login?error=SessionExpired');
-        return;
-      }
-
-      if (res.status === 403) {
-        router.push('/login?error=InvalidToken');
+      if (res.status === 401 || res.status === 403) {
+        sessionStorage.removeItem('adminAuthToken');
+        router.push('/login');
         return;
       }
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Delete failed: ${errorText}`);
+        throw new Error(`Delete failed: ${res.status}`);
       }
 
-      setShowSuccessMessage('Website deleted successfully!');
+      setShowSuccessMessage('✅ Website deleted successfully!');
       setTimeout(() => setShowSuccessMessage(''), 2000);
       
       setItems(prevItems => prevItems.filter(item => item.id !== id));
@@ -594,43 +692,76 @@ const AdminPanel = () => {
  
     } catch (err) {
       if (err.message.includes('401') || err.message.includes('403')) {
-        router.push('/login?error=SessionExpired');
+        router.push('/login');
       } else {
-        console.error('Delete error:', err);
         setError(err.message || 'Delete error');
       }
     }
   };
+
+  // ============ LOGOUT HANDLERS ============
 
   const confirmLogout = () => {
     setShowLogoutConfirm(true);
   };
 
   const performLogout = () => {
+    sessionStorage.removeItem('adminAuthToken');
+    localStorage.removeItem('adminAuthToken');
+    
     setUserData(null);
     setAuthToken(null);
     setItems([]);
     setTimeRemaining(null);
+    setIsTokenValidated(false);
+    tokenCheckedRef.current = false;
+    websitesFetched.current = false;
     
-    window.history.replaceState({}, document.title, window.location.pathname);
-    router.push('/login?message=LoggedOut');
+    router.push('/login');
   };
 
   const cancelLogout = () => {
     setShowLogoutConfirm(false);
   };
 
-  // Show loading if no user data
-  if (!userData) {
+  // ============ LOADING STATE ============
+
+  if (loading) {
     return (
       <div className={styles.adminContainer}>
         <div className={styles.loading}>
           <div className={styles.loadingSpinner}></div>
-          Validating session...
+          <div className={styles.loadingText}>
+            <h3>🔐 Validating secure session...</h3>
+            <p>Please wait while we verify your credentials</p>
+            {tokenValidationAttempts > 0 && (
+              <small>Attempt {tokenValidationAttempts}...</small>
+            )}
+          </div>
         </div>
       </div>
     );
   }
+
+  if (!userData || !isTokenValidated) {
+    return (
+      <div className={styles.adminContainer}>
+        <div className={styles.errorMessage}>
+          <span className={styles.errorIcon}>⚠️</span>
+          <h3>Invalid Session</h3>
+          <p>Please login again to access the admin panel.</p>
+          <button 
+            onClick={() => router.push('/login')}
+            className={styles.primaryButton}
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============ MAIN RENDER ============
 
   return (
     <div className={styles.adminContainer}>
@@ -641,6 +772,14 @@ const AdminPanel = () => {
           <span className={styles.timerText}>
             Session expires in: {timeRemaining.hours}h {timeRemaining.minutes}m {timeRemaining.seconds}s
           </span>
+          {timeRemaining.total <= 300 && (
+            <button 
+              onClick={performLogout}
+              className={styles.timerLogoutButton}
+            >
+              Logout Now
+            </button>
+          )}
         </div>
       )}
 
@@ -650,6 +789,9 @@ const AdminPanel = () => {
           <div className={styles.modalContent}>
             <h3>Confirm Logout</h3>
             <p>Are you sure you want to logout?</p>
+            <p className={styles.modalWarning}>
+              Any unsaved changes will be lost.
+            </p>
             <div className={styles.modalButtons}>
               <button 
                 onClick={cancelLogout} 
@@ -681,6 +823,12 @@ const AdminPanel = () => {
         <div className={styles.errorMessage}>
           <span className={styles.errorIcon}>⚠️</span>
           {error}
+          <button 
+            className={styles.errorDismiss}
+            onClick={() => setError(null)}
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -694,6 +842,7 @@ const AdminPanel = () => {
             <p className={styles.headerSubtitle}>
               Manage your AI-powered websites
             </p>
+          
           </div>
           
           <div className={styles.headerRight}>
@@ -704,9 +853,9 @@ const AdminPanel = () => {
               <div className={styles.profileInfo}>
                 <div className={styles.userStatus}>
                   <span className={`${styles.statusBadge} ${userData.plan ? styles.active : styles.inactive}`}>
-                    {userData.plan ? 'Active Plan' : 'Free Plan'}
+                    {userData.planName ? `✨ ${userData.planName}` : '🔹 Free Plan'}
                   </span>
-                  <span className={styles.websiteCount}>
+                 <span className={styles.websiteCount}>
                     {items.length}/{userData.maxBot}
                   </span>
                 </div>
@@ -716,7 +865,11 @@ const AdminPanel = () => {
                     style={{ 
                       width: `${Math.min((items.length / userData.maxBot) * 100, 100)}%` 
                     }}
-                  ></div>
+                  >
+                    <span className={styles.usagePercentage}>
+                      {Math.round((items.length / userData.maxBot) * 100)}%
+                    </span>
+                  </div>
                   <span className={styles.usageText}>
                     {items.length} of {userData.maxBot} websites used
                   </span>
@@ -751,7 +904,7 @@ const AdminPanel = () => {
               {items.length >= userData.maxBot && !editingId && (
                 <div className={styles.upgradePrompt}>
                   <span className={styles.upgradeIcon}>✨</span>
-                  <span className={styles.upgradeText}>
+                   <span className={styles.upgradeText}>
                     Max limit reached. <button className={styles.upgradeLink}>Upgrade plan</button>
                   </span>
                 </div>
@@ -836,7 +989,7 @@ const AdminPanel = () => {
               <div className={styles.planReminder}>
                 <span className={styles.planReminderIcon}>💡</span>
                 <span className={styles.planReminderText}>
-                  Plan: <strong>{userData.plan ? 'Active' : 'Free'}</strong> | 
+                  Plan: <strong>{userData.planName || 'Free'}</strong> | 
                   Limit: <strong>{userData.maxBot} websites</strong> | 
                   Used: <strong>{items.length}/{userData.maxBot}</strong>
                 </span>

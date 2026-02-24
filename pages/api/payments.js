@@ -1,46 +1,22 @@
-// import { NextResponse } from "next/server";
-// import { getAllSubscriptions } from "../../app/model/subscription-db"; // <--- Changed from getAllPayments
-// // import { getServerSession } from "next-auth";
-// import { getServerSession } from "next-auth/next";
-
-// import { authOptions } from "../api/auth/[...nextauth]"; 
-
-// export async function GET() {
-//   const session = await getServerSession(authOptions);
-  
-//   if (session?.user?.isSuperAdmin !== true) {
-//     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-//   }
-
-//   const payments = await getAllSubscriptions();
-//   return NextResponse.json(payments);
-// }
-
-
-
 import { getServerSession } from "next-auth";
 import { authOptions } from "./auth/[...nextauth]";
-import { getAllSubscriptions } from "../../app/model/subscription-db"; 
+import { getAllSubscriptions, getUserSubscriptionHistory } from "../../app/model/subscription-db"; 
 import { getUserById } from "../../app/model/user-db"; 
 import { getPlanById } from "../../app/model/plan-db"; 
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
 
-  // 1. Security Check
   const session = await getServerSession(req, res, authOptions);
-  
-  if (!session || !session.user.isSuperAdmin) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!session) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    // 2. Get Raw Subscriptions
-    const rawSubs = await getAllSubscriptions();
+    // Logic: SuperAdmin gets all, Normal user gets their own history
+    const rawSubs = session.user.isSuperAdmin 
+        ? await getAllSubscriptions() 
+        : await getUserSubscriptionHistory(session.user.id);
 
-    // 3. Enrich Data (Fetch User and Plan details for each subscription)
     const enrichedSubs = await Promise.all(rawSubs.map(async (sub) => {
-      // Fetch details in parallel or sequentially (Parallel is faster)
       const [user, plan] = await Promise.all([
         getUserById(sub.user_id),
         getPlanById(sub.plan_id)
@@ -55,9 +31,7 @@ export default async function handler(req, res) {
     }));
 
     return res.status(200).json(enrichedSubs);
-
   } catch (error) {
-    console.error("Payments API Error:", error);
-    return res.status(500).json({ error: "Failed to fetch payments" });
+    return res.status(500).json({ error: "Failed to fetch history" });
   }
 }

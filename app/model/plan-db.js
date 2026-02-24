@@ -39,10 +39,8 @@ export async function createPlan(planData) {
     plan_name: planData.name,
     amount: Number(planData.amount),
     duration: Number(planData.duration) || 30, // Default 30 days
-    
-    // ✅ NEW: Store features directly as an object { "Max Bots": "3", "Storage": "1GB" }
-    features: planData.features || {}, 
-    
+    grace_period: Number(planData.grace_period) || 7,
+    features: planData.features || {}, // Store features directly as an object { "Max Bots": "3", "Storage": "1GB" }
     status: "active", // Default status
     createdAt: new Date().toISOString(),
   };
@@ -60,23 +58,50 @@ export async function createPlan(planData) {
 }
 
 // 4. UPDATE PLAN (Full Update: Name, Price, Features)
+// export async function updatePlan(planId, data) {
+//   try {
+//     await docClient.send(new UpdateCommand({
+//       TableName: PLANS_TABLE,
+//       Key: { plan_id: planId },
+//       // 1. Use alias #d instead of 'duration'
+//       UpdateExpression: "set plan_name = :n, amount = :a, #d = :d, features = :f", 
+      
+//       // 2. Define what #d means
+//       ExpressionAttributeNames: {
+//         "#d": "duration" 
+//       },
+      
+//       ExpressionAttributeValues: {
+//         ":n": data.name,
+//         ":a": Number(data.amount),
+//         ":d": Number(data.duration) || 30,
+//         ":g": Number(data.grace_period) || 7, // ADDED GRACE PERIOD
+//         ":f": data.features || {} 
+//       },
+//       ReturnValues: "UPDATED_NEW"
+//     }));
+//     return { success: true };
+//   } catch (error) {
+//     console.error("Update Plan Error:", error);
+//     return { success: false, error: error.message };
+//   }
+// }
+// app/model/plan-db.js
 export async function updatePlan(planId, data) {
   try {
     await docClient.send(new UpdateCommand({
       TableName: PLANS_TABLE,
       Key: { plan_id: planId },
-      // 1. Use alias #d instead of 'duration'
-      UpdateExpression: "set plan_name = :n, amount = :a, #d = :d, features = :f", 
-      
-      // 2. Define what #d means
+      // FIX: Added grace_period = :g to the string below
+      UpdateExpression: "set plan_name = :n, amount = :a, #d = :d, grace_period = :g, features = :f",
       ExpressionAttributeNames: {
         "#d": "duration" 
       },
-      
       ExpressionAttributeValues: {
         ":n": data.name,
         ":a": Number(data.amount),
         ":d": Number(data.duration) || 30,
+        ":g": Number(data.grace_period) || 7, // Maps to :g
         ":f": data.features || {} 
       },
       ReturnValues: "UPDATED_NEW"
