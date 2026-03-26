@@ -1,301 +1,470 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import WebsiteConfig from '../app/components/superadminauthorform/index';
-import WebsiteList from '../app/components/superadminauthorlist/index';
-import styles from './superadminpanel.module.css';
-import config from '../app/components/utils/config';
+import WebsiteList   from '../app/components/superadminauthorlist/index';
+import styles        from './AdminPanel.module.css';
+import config        from '../app/components/utils/config';
+import { signOut }   from 'next-auth/react';
 
 const API_URL = `${config.apiBaseUrl}/api/websites`;
+const POLL_INTERVAL = 5000; // 5 seconds
 
-const AdminPanel = ({
-  backendApiKey = config.backendApiKey
-}) => {
-  const [items, setItems] = useState([]);
-  const [editingId, setEditingId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const SuperAdminPanel = () => {
+  const router = useRouter();
+
+  const [verified, setVerified]               = useState(false);
+  const [checking, setChecking]               = useState(true);
+  const [items, setItems]                     = useState([]);
+  const [editingId, setEditingId]             = useState(null);
+  const [showForm, setShowForm]               = useState(false);
+  const [loading, setLoading]                 = useState(true);
+  const [saving, setSaving]                   = useState(false);
+  const [error, setError]                     = useState(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState('');
+  const [showLogoutConfirm, setShowLogoutConfirm]   = useState(false);
+
+  const pollRef        = useRef(null);
+  const itemsRef       = useRef(items); // latest items ka ref — polling mein stale closure se bachao
+  itemsRef.current     = items;
+
+  const userData = { planName: 'Super Admin', plan: true, maxBot: Infinity };
 
   const [configData, setConfigData] = useState({
-    websiteName: '',
-    websiteUrl: '',
-    category: [],
-    systemPrompt: [],
-    customPrompt: [],
-    roles: [], // Array of role names ONLY (for role field)
-    aifuture: [], // Array of {title: roleName, value: [...]}
-    status: 'active'
+    websiteName: '', websiteUrl: '', category: [],
+    systemPrompt: [], customPrompt: [], roles: [],
+    aifuture: [], status: 'active'
   });
-
   const [tempSystemPrompt, setTempSystemPrompt] = useState('');
   const [tempCustomPrompt, setTempCustomPrompt] = useState('');
-  const [tempCategory, setTempCategory] = useState('');
-  const [tempRole, setTempRole] = useState('');
-  const [tempRoleValue, setTempRoleValue] = useState('');
+  const [tempCategory, setTempCategory]         = useState('');
+  const [tempRole, setTempRole]                 = useState('');
+  const [tempRoleValue, setTempRoleValue]       = useState('');
 
-  // Fetch all websites
-  const fetchItems = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error('Failed to fetch data');
-      const data = await res.json();
-      
-      
-      
-      const processedItems = (data.items || []).map(item => {
-       
-        
-        return {
-          ...item,
-          roles: item.role || [], // Map database "role" field to "roles" in state
-          aifuture: item.aifuture || []
-        };
-      });
-      
-     
-      setItems(processedItems);
-      setShowForm(processedItems.length === 0);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── AUTH GUARD ──
   useEffect(() => {
-    fetchItems();
+    async function verifyAccess() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken  = urlParams.get('token');
+      if (urlToken) {
+        sessionStorage.setItem('superAdminToken', urlToken);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      const token = sessionStorage.getItem('superAdminToken');
+      if (!token) { window.location.replace('/login'); return; }
+
+      try {
+        const res  = await fetch('/api/verify-superadmin-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.valid || !data.isSuperAdmin) {
+          sessionStorage.removeItem('superAdminToken');
+          window.location.replace('/login?error=Unauthorized');
+          return;
+        }
+        setVerified(true);
+        window.history.pushState(null, '', window.location.pathname);
+      } catch {
+        sessionStorage.removeItem('superAdminToken');
+        window.location.replace('/login');
+      } finally {
+        setChecking(false);
+      }
+    }
+
+    const blockBack = () => {
+      const token = sessionStorage.getItem('superAdminToken');
+      if (!token) window.location.replace('/login');
+      else window.history.pushState(null, '', window.location.href);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', blockBack);
+    verifyAccess();
+    return () => window.removeEventListener('popstate', blockBack);
   }, []);
 
+  // ── FETCH — silent (no loading spinner, sirf items update) ──
+  const fetchItems = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await fetch(API_URL, {
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store'
+      });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+
+      const processed = (data.items || []).map(item => ({
+        ...item,
+        roles:    item.role    || item.roles    || [],
+        aifuture: item.aifuture || []
+      }));
+
+      // ── Smart merge — sirf changed items update karo ──
+      setItems(prev => {
+        const prevMap = Object.fromEntries(prev.map(i => [i.id, i]));
+        return processed.map(newItem => {
+          const old = prevMap[newItem.id];
+          if (!old) return newItem;
+          // Agar status ya lock changed hai to update karo, warna old raho
+          if (
+            old.status            !== newItem.status ||
+            old.superAdminLocked  !== newItem.superAdminLocked
+          ) return newItem;
+          return old;
+        });
+      });
+
+      if (!silent) setShowForm(processed.length === 0);
+    } catch (err) {
+      if (!silent) setError(err.message || 'Failed to fetch data');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    if (verified) fetchItems(false);
+  }, [verified, fetchItems]);
+
+  // ── POLLING — har 5 second mein silent fetch ──
+  useEffect(() => {
+    if (!verified) return;
+
+    pollRef.current = setInterval(() => {
+      fetchItems(true); // silent = true → no loading spinner
+    }, POLL_INTERVAL);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [verified, fetchItems]);
+
+  // ── FORM ──
   const resetForm = () => {
     setConfigData({
-      websiteName: '',
-      websiteUrl: '',
-      category: [],
-      systemPrompt: [],
-      customPrompt: [],
-      roles: [],
-      aifuture: [],
-      status: 'active'
+      websiteName: '', websiteUrl: '', category: [],
+      systemPrompt: [], customPrompt: [], roles: [],
+      aifuture: [], status: 'active'
     });
-    setTempSystemPrompt('');
-    setTempCustomPrompt('');
-    setTempCategory('');
-    setTempRole('');
-    setTempRoleValue('');
+    setTempSystemPrompt(''); setTempCustomPrompt('');
+    setTempCategory(''); setTempRole(''); setTempRoleValue('');
     setEditingId(null);
   };
 
-  const handleAddNew = () => {
-    resetForm();
-    setShowForm(true);
-  };
+  const handleAddNew    = () => { resetForm(); setShowForm(true); };
+  const handleShowList  = () => { resetForm(); setShowForm(false); };
 
-  const handleShowList = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
+  // ── SUBMIT ──
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
+    setError(null);
 
- 
-
-    // Prepare payload - roles should be separate array
     const payload = {
-      websiteName: configData.websiteName,
-      websiteUrl: configData.websiteUrl,
-      category: configData.category,
+      websiteName:  configData.websiteName,
+      websiteUrl:   configData.websiteUrl,
+      category:     configData.category,
       systemPrompt: configData.systemPrompt,
       customPrompt: configData.customPrompt,
-      role: configData.roles, // Send as "role" field for database
-      aifuture: configData.aifuture, // Send aifuture array
-      status: configData.status
+      role:         configData.roles,
+      aifuture:     configData.aifuture,
+      status:       configData.status
     };
 
-
-
     try {
-      const url = editingId ? `${API_URL}/${editingId}` : API_URL;
+      const url    = editingId ? `${API_URL}/${editingId}` : API_URL;
       const method = editingId ? 'PUT' : 'POST';
-      
+
       const res = await fetch(url, {
         method,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${backendApiKey}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        console.error('❌ Backend error response:', errorData);
-        throw new Error(errorData.error || 'Failed to save');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to save: ${res.status}`);
       }
 
-      const responseData = await res.json();
-     
-
-      await fetchItems();
+      setShowSuccessMessage(editingId ? '✅ Website updated!' : '✅ Website created!');
+      setTimeout(() => setShowSuccessMessage(''), 3000);
+      await fetchItems(false);
       resetForm();
-      setShowForm(items.length === 0);
-  
+      setShowForm(false);
     } catch (err) {
-      console.error('❌ Save error:', err);
       setError(err.message || 'Error saving data');
-     
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
-const handleStatusChange = async (id, newStatus) => {
-    console.log('Changing status for ID:', id, 'to:', newStatus);
-    
+
+  // ── STATUS CHANGE — SUPERADMIN ──
+  const handleStatusChange = async (id, newStatus) => {
     try {
-      // Find the item
-      const item = items.find((i) => i.id === id);
-      if (!item) {
-        console.error('Item not found with ID:', id);
-        return;
-      }
-
-      // Prepare payload with all existing data + new status
-      const payload = {
-      
-        status: newStatus,
-        apiKey: item.apiKey
-      };
-
-   
-
-      const res = await fetch(`${API_URL}/${id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${backendApiKey}`
-        },
-        body: JSON.stringify(payload),
+      const res = await fetch(`${API_URL}/${id}/status/role-aware`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ status: newStatus, changedBy: 'superadmin' }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error('❌ Backend error response:', errorData);
-        throw new Error(errorData.error || 'Failed to update status');
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update status');
 
-      // Update local state immediately for better UX
-      setItems(prevItems => 
-        prevItems.map(item => 
-          item.id === id ? { ...item, status: newStatus } : item
-        )
-      );
-      
-      console.log('Status updated successfully');
-      
+      // ✅ Optimistic update — UI turant update ho jaye, polling ka wait nahi
+      setItems(prev => prev.map(i =>
+        i.id === id
+          ? { ...i, status: newStatus, superAdminLocked: data.superAdminLocked || false }
+          : i
+      ));
+
+      const lockMsg = data.superAdminLocked ? ' 🔒 Admin cannot reactivate' : '';
+      setShowSuccessMessage(`✅ Status updated to ${newStatus}${lockMsg}`);
+      setTimeout(() => setShowSuccessMessage(''), 3000);
     } catch (err) {
-      console.error('❌ Status update error:', err);
       setError(err.message || 'Error updating status');
     }
   };
 
+  // ── EDIT ──
   const handleEdit = (id) => {
-    const item = items.find((i) => i.id === id);
+    const item = items.find(i => i.id === id);
     if (item) {
-    
-      
       setConfigData({
-        websiteName: item.websiteName,
-        websiteUrl: item.websiteUrl,
-        category: item.category || [],
+        websiteName:  item.websiteName,
+        websiteUrl:   item.websiteUrl,
+        category:     item.category     || [],
         systemPrompt: item.systemPrompt || [],
         customPrompt: item.customPrompt || [],
-        roles: item.roles || [], // Use the mapped roles
-        aifuture: item.aifuture || [],
-        status: item.status || 'active',
-        apiKey: item.apiKey
+        roles:        item.roles        || [],
+        aifuture:     item.aifuture     || [],
+        status:       item.status       || 'active',
+        apiKey:       item.apiKey
       });
       setEditingId(id);
       setShowForm(true);
     }
   };
 
+  // ── DELETE ──
   const handleDelete = async (id) => {
-   
-    
     try {
-      const res = await fetch(`${API_URL}/${id}`, { 
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${backendApiKey}`
-        }
+      const res = await fetch(`${API_URL}/${id}`, {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' }
       });
-      if (!res.ok) throw new Error('Delete failed');
+      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 
-      await fetchItems();
-      setShowForm(items.length === 1);
- 
+      setShowSuccessMessage('✅ Website deleted!');
+      setTimeout(() => setShowSuccessMessage(''), 2000);
+      setItems(prev => prev.filter(item => item.id !== id));
+      if (items.length <= 1) setShowForm(true);
     } catch (err) {
-      console.error('❌ Delete error:', err);
       setError(err.message || 'Delete error');
-    
     }
   };
 
+  // ── LOGOUT ──
+  const confirmLogout  = () => setShowLogoutConfirm(true);
+  const cancelLogout   = () => setShowLogoutConfirm(false);
+  const performLogout  = async () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    sessionStorage.removeItem('superAdminToken');
+    sessionStorage.clear();
+    localStorage.removeItem('superAdminKey');
+    try { await signOut({ redirect: false }); } catch {}
+    window.location.replace('/login');
+  };
+
+  // ── SCREENS ──
+  if (checking) {
+    return (
+      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'16px' }}>
+        <div style={{ width:'48px', height:'48px', border:'4px solid #e2e8f0', borderTop:'4px solid #6366f1', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+        <p style={{ color:'#64748b', fontWeight:600 }}>🔐 Verifying super admin access...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (!verified) return null;
+
+  if (loading) {
+    return (
+      <div className={styles.adminContainer}>
+        <div className={styles.loading}>
+          <div className={styles.loadingSpinner}></div>
+          <div className={styles.loadingText}>
+            <h3>🔐 Loading Super Admin Panel...</h3>
+            <p>Fetching all websites</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── MAIN RENDER ──
   return (
     <div className={styles.adminContainer}>
+
+      {showLogoutConfirm && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3>Confirm Logout</h3>
+            <p>Are you sure you want to logout?</p>
+            <p className={styles.modalWarning}>Any unsaved changes will be lost.</p>
+            <div className={styles.modalButtons}>
+              <button onClick={cancelLogout}  className={styles.modalCancelButton}>Cancel</button>
+              <button onClick={performLogout} className={styles.modalConfirmButton}>Yes, Logout</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSuccessMessage && (
+        <div className={styles.successMessage}>
+          <span className={styles.successIcon}>✓</span>
+          {showSuccessMessage}
+        </div>
+      )}
+
+      {error && (
+        <div className={styles.errorMessage}>
+          <span className={styles.errorIcon}>⚠️</span>
+          {error}
+          <button className={styles.errorDismiss} onClick={() => setError(null)}>×</button>
+        </div>
+      )}
+
       <div className={styles.adminHeader}>
-        <h1 className={styles.adminTitle}>Super Admin Dashboard</h1>
-        {!loading && items.length > 0 && !showForm && (
-          <div className={styles.adminButtons}>
-            <button className={styles.adminButton} onClick={handleAddNew}>
-              Add New Website
+        <div className={styles.headerTop}>
+          <div className={styles.headerLeft}>
+            <h1 className={styles.adminTitle}>
+              <span className={styles.titleIcon}>🛡️</span>
+              Super Admin Studio
+            </h1>
+            <p className={styles.headerSubtitle}>Manage all AI-powered websites</p>
+          </div>
+
+          <div className={styles.headerRight}>
+            <div className={styles.userProfile}>
+              <div className={styles.profileIcon}>
+                <span className={styles.icon}>👑</span>
+              </div>
+              <div className={styles.profileInfo}>
+                <div className={styles.userStatus}>
+                  <span className={`${styles.statusBadge} ${styles.active}`}>✨ Super Admin</span>
+                  <span className={styles.websiteCount}>{items.length} total</span>
+                </div>
+                <div className={styles.usageBar}>
+                  <div className={styles.usageFill} style={{ width: '100%' }}>
+                    <span className={styles.usagePercentage}>∞</span>
+                  </div>
+                  <span className={styles.usageText}>{items.length} websites — unlimited access</span>
+                </div>
+              </div>
+            </div>
+
+            <button onClick={() => router.push('/dashboard')} className={styles.dashboardButton}>
+              <span className={styles.dashboardIcon}>📊</span>
+              <span className={styles.dashboardText}>Dashboard</span>
+            </button>
+
+            <button onClick={confirmLogout} className={styles.logoutButton}>
+              <span className={styles.logoutIcon}>↪</span>
+              <span className={styles.logoutText}>Logout</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.adminContent}>
+        <div className={styles.headerBottom}>
+          <div className={styles.actionButtons}>
+            <div className={styles.buttonWithUpgrade}>
+              <button className={styles.primaryButton} onClick={handleAddNew}>
+                <span className={styles.buttonIcon}>+</span>
+                Add New Website
+              </button>
+            </div>
+
+            {items.length > 0 && (
+              <div className={styles.statsBox}>
+                <div className={styles.statItem}>
+                  <span className={styles.statNumber}>{items.filter(i => i.status === 'active').length}</span>
+                  <span className={styles.statLabel}>Active</span>
+                </div>
+                <div className={styles.statDivider}>|</div>
+                <div className={styles.statItem}>
+                  <span className={styles.statNumber}>{items.filter(i => i.status === 'inactive').length}</span>
+                  <span className={styles.statLabel}>Inactive</span>
+                </div>
+                <div className={styles.statDivider}>|</div>
+                <div className={styles.statItem}>
+                  <span className={styles.statNumber}>{items.length}</span>
+                  <span className={styles.statLabel}>Total</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {showForm ? (
+          <WebsiteConfig
+            config={configData}
+            setConfig={setConfigData}
+            tempSystemPrompt={tempSystemPrompt}
+            setTempSystemPrompt={setTempSystemPrompt}
+            tempCustomPrompt={tempCustomPrompt}
+            setTempCustomPrompt={setTempCustomPrompt}
+            tempCategory={tempCategory}
+            setTempCategory={setTempCategory}
+            tempRole={tempRole}
+            setTempRole={setTempRole}
+            tempRoleValue={tempRoleValue}
+            setTempRoleValue={setTempRoleValue}
+            onSubmit={handleSubmit}
+            onCancel={handleShowList}
+            hasItems={items.length > 0}
+            websiteId={editingId}
+            apiKey={configData.apiKey}
+            backendApiKey={configData.apiKey}
+            saving={saving}
+          />
+        ) : items.length > 0 ? (
+          <WebsiteList
+            websites={items}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onAddNew={handleAddNew}
+            onStatusChange={handleStatusChange}
+          />
+        ) : (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyStateIcon}>📝</div>
+            <h3 className={styles.emptyStateTitle}>No Websites Yet</h3>
+            <p className={styles.emptyStateText}>No websites created yet. Add the first one!</p>
+            <div className={styles.planReminder}>
+              <span className={styles.planReminderIcon}>💡</span>
+              <span className={styles.planReminderText}>
+                Plan: <strong>Super Admin</strong> | Access: <strong>Unlimited</strong>
+              </span>
+            </div>
+            <button className={styles.emptyStateButton} onClick={handleAddNew}>
+              Create First Website
             </button>
           </div>
         )}
       </div>
-
-      {loading ? (
-        <div className={styles.loading}>Loading...</div>
-      ) : error ? (
-        <div className={styles.error}>Error: {error}</div>
-      ) : (
-        <div className={styles.adminContent}>
-          {showForm ? (
-            <WebsiteConfig
-              config={configData}
-              setConfig={setConfigData}
-              tempSystemPrompt={tempSystemPrompt}
-              setTempSystemPrompt={setTempSystemPrompt}
-              tempCustomPrompt={tempCustomPrompt}
-              setTempCustomPrompt={setTempCustomPrompt}
-              tempCategory={tempCategory}
-              setTempCategory={setTempCategory}
-              tempRole={tempRole}
-              setTempRole={setTempRole}
-              tempRoleValue={tempRoleValue}
-              setTempRoleValue={setTempRoleValue}
-              onSubmit={handleSubmit}
-              onCancel={handleShowList}
-              hasItems={items.length > 0}
-              websiteId={editingId}
-              apiKey={configData.apiKey}
-              backendApiKey={backendApiKey}
-            />
-          ) : (
-            <WebsiteList
-              websites={items}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onAddNew={handleAddNew}
-              onStatusChange={handleStatusChange}
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 };
 
-export default AdminPanel;
+export default SuperAdminPanel;

@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     const tokenData = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
     if (!tokenData) {
-      console.log("Debug: No Token. Redirecting to login.");
+     
       res.redirect("/login?error=SessionMissing");
       return;
     }

@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import styles from './ChatHeader.module.css';
 
 const ChatHeader = ({ 
-  secondaryColor = 'tomato', 
-  primaryColor = '#4a6baf',
+
+  primaryColor = '#ff6347',
+  headerColor, 
   connectionStatus = 'connected', 
   onClose,
   apiBaseUrl = '', 
@@ -12,10 +13,13 @@ const ChatHeader = ({
   websiteTitle = 'Support',
   isWebsiteActive = true,
   websiteStatus = 'active',
-  showCloseButton = false // This will be true only on mobile/tablet
+  showCloseButton = false
 }) => {
   const [status, setStatus] = useState({ text: 'Connecting...', color: '#FF9800' });
   const [isLoading, setIsLoading] = useState(true);
+
+  // Log to verify headerColor is received
+
 
   useEffect(() => {
     const fetchWebsiteByApiKey = async () => {
@@ -42,7 +46,6 @@ const ChatHeader = ({
         if (data.success && data.item) {
           const websiteData = data.item;
           
-          // Check if website is active
           if (websiteData.status === 'active') {
             setStatus({ text: 'Online', color: '#4CAF50' });
           } else {
@@ -62,10 +65,14 @@ const ChatHeader = ({
   }, [apiBaseUrl, backendApiKey]);
 
   return (
-    <div className={styles.chatHeader} style={{ 
-      backgroundColor: secondaryColor,
-      borderBottom: `1px solid ${primaryColor}20`
-    }}>
+    <div 
+      className={styles.chatHeader} 
+      style={{ 
+        // ✅ Use headerColor from database if available, otherwise fallback to secondaryColor
+        backgroundColor: headerColor || primaryColor,
+        borderBottom: `1px solid ${primaryColor}20`
+      }}
+    >
       <div className={styles.headerContent}>
         <div className={styles.headerInfo}>
           <div className={styles.avatarContainer}>
@@ -87,7 +94,6 @@ const ChatHeader = ({
           </div>
         </div>
 
-        {/* Show cross icon only on mobile/tablet */}
         {showCloseButton && (
           <div className={styles.headerActions}>
             <button 

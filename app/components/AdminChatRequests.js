@@ -69,8 +69,7 @@ const AdminChatRequests = ({
       setLoading(true);
       setError('');
       
-      console.log('🔄 Fetching chat requests...');
-      console.log('Using APP ID:', finalBackendApiKey);
+    
       
       if (!finalBackendApiKey) {
         throw new Error('Backend APP ID is required. Please provide it in the URL.');
@@ -87,7 +86,7 @@ const AdminChatRequests = ({
       }
       
       const url = `${apiBaseUrl}/api/chat-requests?${urlParams.toString()}`;
-      console.log('API URL:', url);
+     
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -103,7 +102,7 @@ const AdminChatRequests = ({
 
       clearTimeout(timeoutId);
       
-      console.log('Response status:', response.status);
+    
       
       if (!response.ok) {
         let errorMessage = `Server returned ${response.status}: ${response.statusText}`;
@@ -120,7 +119,7 @@ const AdminChatRequests = ({
       }
       
       const result = await response.json();
-      console.log('API Response:', result);
+  
       
       if (result.success) {
         const sortedData = (result.data || []).sort((a, b) => 
@@ -167,7 +166,7 @@ const AdminChatRequests = ({
     try {
       setError('');
       
-      console.log('Updating status for:', requestId, 'to:', newStatus);
+     
       
       const url = `${apiBaseUrl}/api/chat-requests/${requestId}/status`;
       
@@ -201,7 +200,7 @@ const AdminChatRequests = ({
       }
 
       const result = await response.json();
-      console.log('Update result:', result);
+     
       
       if (result.success) {
         const updatedRequest = result.data;
@@ -290,9 +289,7 @@ const AdminChatRequests = ({
 
   useEffect(() => {
     const initializeData = async () => {
-      console.log('🚀 Initializing Admin Chat Requests...');
-      console.log('API Base URL:', apiBaseUrl);
-      console.log('Backend APP ID from URL:', finalBackendApiKey);
+    
       
       await fetchChatRequests();
     };
@@ -471,13 +468,7 @@ const AdminChatRequests = ({
               )}
               <button 
                 onClick={() => {
-                  console.log('Current state:', {
-                    apiBaseUrl,
-                    finalBackendApiKey: finalBackendApiKey ? `***${finalBackendApiKey.slice(-4)}` : 'missing',
-                    urlBackendApiKey,
-                    chatRequestsCount: chatRequests.length,
-                    connectionStatus
-                  });
+                
                 }}
                 className={styles.debugButton}
               >

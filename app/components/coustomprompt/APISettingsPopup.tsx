@@ -473,7 +473,7 @@ const UseApiPopup: React.FC<UseApiPopupProps> = ({
           sk: `prompt#${promptName}`
         }
         
-        console.log('Saving data with summaryList:', updateData); // Debug log
+      
         
         const res = await fetch(endpoint, {
           method: 'PUT',

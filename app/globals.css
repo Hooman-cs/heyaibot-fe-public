@@ -3,7 +3,45 @@
 /* Tailwind v4 automatically scans your /src folder.
    You do not need to manually configure paths.
 */
- 
+ /* global.css ya App.css */
+
+/* Ensure popup is above everything */
+.custom-prompt-popup-open {
+  overflow: hidden !important;
+}
+
+.custom-prompt-popup-open body {
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+/* Force popup to be on top */
+.custom-prompt-popup-open .fixed,
+.custom-prompt-popup-open [class*="header"],
+.custom-prompt-popup-open [class*="Header"] {
+  z-index: auto !important;
+}
+/* global.css */
+
+/* Ensure modals always on top */
+.modal-open {
+  overflow: hidden !important;
+}
+
+.modal-open .fixed,
+.modal-open [class*="overlay"],
+.modal-open [class*="popup"] {
+  z-index: auto !important;
+}
+
+/* Force UseApiPopup to be above CustomPromptPopup */
+.use-api-popup-open {
+  overflow: hidden !important;
+}
+
+.use-api-popup-open .custom-prompt-popup {
+  z-index: auto !important;
+}
 html {
   scroll-behavior: smooth;
 }

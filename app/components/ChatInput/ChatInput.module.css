@@ -1,21 +1,24 @@
+/* ✅ Outer wrapper that holds input row + powered by */
+.chatInputWrapper {
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  border-top: 1px solid #e0e0e0;
+}
+
+.chatInputWrapper.fullScreen {
+  border-radius: 0;
+}
+
+/* Input row - no border-top here since wrapper has it */
 .chatInputContainer {
   display: flex;
   gap: 12px;
   padding: 12px 16px;
   background-color: white;
-  border-bottom: 1px solid #e0e0e0;
-border-left: 1px solid #e0e0e0;
-border-right: 1px solid #e0e0e0;
-border-top: none;
-background-color: white;
-
   transition: all 0.3s ease;
   align-items: center;
-border-bottom-left-radius: 12px;
-border-bottom-right-radius: 12px;
-border-top-left-radius: 0;
-border-top-right-radius: 0;
-
+  border-top: none;
 }
 
 .chatInputContainer[data-focused="true"] {
@@ -23,7 +26,6 @@ border-top-right-radius: 0;
 }
 
 .chatInputContainer[data-disabled="true"] {
- 
   background-color: #f5f5f5;
 }
 
@@ -39,21 +41,44 @@ border-top-right-radius: 0;
   padding: 12px 16px;
   padding-right: 40px;
   border-radius: 24px;
-  border: 1px solid var(--secondary-color-light);
-  font-size: 15px;
+  border: 1.5px solid #c0c0c0;  /* ✅ darker border - visible on white */
+  font-size: 16px;
   outline: none;
   transition: all 0.3s ease;
-  background-color: white;
+  background-color: #fafafa;    /* ✅ slight off-white so border stands out */
   min-height: 20px;
   max-height: 120px;
   resize: none;
   line-height: 1.4;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); /* ✅ subtle shadow for depth */
 }
 
 .chatInput:focus {
-  border-color: var(--secondary-color);
-  box-shadow: 0 0 0 2px var(--secondary-color-light);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2.5px var(--primary-color-light);
+  background-color: white;
+  outline: none;
 }
+
+.chatInput:disabled {
+  background-color: #f0f0f0;
+  border-color: #ddd;
+  color: #999;
+  cursor: not-allowed;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .chatInput {
+    font-size: 16px !important;
+    max-height: 45px;
+  }
+}
+
+
+
 
 .clearButton {
   position: absolute;
@@ -71,8 +96,8 @@ border-top-right-radius: 0;
 }
 
 .clearButton:hover {
-  color: var(--secondary-color);
-  background-color: var(--secondary-color-light);
+  color: var(--primary-color);
+  background-color: var(--primary-color-light);
 }
 
 .clearButton svg {
@@ -88,14 +113,13 @@ border-top-right-radius: 0;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  background-color: #ccc;
-  color: #666;
+  color: white;
   transition: all 0.3s ease;
   flex-shrink: 0;
 }
 
 .chatButton[data-disabled="true"] {
-  background-color: #ccc;
+  background-color: #ccc !important;
   color: #666;
   cursor: not-allowed;
   transform: scale(0.95);
@@ -103,11 +127,36 @@ border-top-right-radius: 0;
 
 .chatButton:not([data-disabled="true"]):hover {
   transform: scale(1.05);
-  box-shadow: 0 2px 10px var(--secondary-color-light);
+  box-shadow: 0 2px 10px var(--primary-color-light);
 }
 
 .chatButton:not([data-disabled="true"]):active {
   transform: scale(0.98);
+}
+
+/* ✅ Powered By styles */
+.poweredBy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 16px 6px;
+  font-size: 11px;
+  color: #aaa;
+  background-color: white;
+  user-select: none;
+}
+
+.poweredByLink {
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.poweredByLink:hover {
+  opacity: 0.75;
+  text-decoration: underline;
 }
 
 /* Responsive adjustments */
@@ -120,7 +169,7 @@ border-top-right-radius: 0;
   .chatInput {
     padding: 10px 14px;
     padding-right: 36px;
-    font-size: 14px;
+    font-size: 16px;
   }
   
   .chatButton {
@@ -130,5 +179,20 @@ border-top-right-radius: 0;
   
   .clearButton {
     right: 10px;
+  }
+
+  .poweredBy {
+    padding: 3px 12px 5px;
+  }
+}
+
+/* Mobile keyboard handling */
+@media (max-width: 768px) {
+  .chatInputWrapper.fullScreen {
+    position: relative;
+    z-index: 100;
+    background-color: white;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
   }
 }

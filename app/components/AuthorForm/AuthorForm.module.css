@@ -1,32 +1,33 @@
+/* The main container — fixed height, no overflow */
 .configContainer {
   display: flex;
   height: 100%;
   width: 100%;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  overflow: hidden;
-  border-radius: 20px;
+  overflow: hidden; /* ✅ Container itself does NOT scroll */
+ 
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   position: relative;
 }
 
-/* Left Sidebar */
+/* Left Sidebar — independent scroll */
 .sidebar {
   width: 280px;
   background: white;
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  overflow: hidden; /* ✅ Sidebar wrapper: no overflow */
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
   position: relative;
   z-index: 2;
+  flex-shrink: 0; /* ✅ Don't shrink sidebar */
 }
 
-/* Vertical Divider between Sidebar and Content */
 .verticalDivider {
   width: 2px;
-  background: linear-gradient(180deg, 
+  background: linear-gradient(180deg,
     rgba(203, 213, 225, 0) 0%,
     #cbd5e1 20%,
     #cbd5e1 80%,
@@ -35,7 +36,7 @@
   height: 100%;
   position: relative;
   z-index: 3;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.03);
+  flex-shrink: 0;
 }
 
 .sidebarHeader {
@@ -46,6 +47,7 @@
   gap: 16px;
   background: white;
   position: relative;
+  flex-shrink: 0; /* ✅ Header stays fixed, doesn't shrink */
 }
 
 .sidebarHeader::after {
@@ -106,13 +108,16 @@
   cursor: not-allowed;
 }
 
-/* Steps Container */
+/* ✅ Steps Container — THIS scrolls independently */
 .stepsContainer {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto;        /* ✅ Only this scrolls inside sidebar */
+  overflow-x: hidden;
   padding: 20px 16px;
+  scroll-behavior: smooth; /* ✅ Smooth scroll */
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f5f9;
+  min-height: 0;           /* ✅ Critical: allows flex child to shrink and scroll */
 }
 
 .stepsContainer::-webkit-scrollbar {
@@ -133,7 +138,6 @@
   background: #94a3b8;
 }
 
-/* Step Items */
 .stepItem {
   display: flex;
   align-items: center;
@@ -172,6 +176,7 @@
   border-radius: 14px;
   transition: all 0.3s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  flex-shrink: 0;
 }
 
 .stepItem:hover .stepIcon {
@@ -212,26 +217,28 @@
   box-shadow: -2px 0 8px rgba(255, 255, 255, 0.5);
 }
 
-/* Right Content Area */
+/* ✅ Right Content Area — independent scroll */
 .contentArea {
   flex: 1;
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
-  background: white;
+  overflow: hidden; /* ✅ Wrapper: no overflow */
   position: relative;
+  min-width: 0; /* ✅ Critical: prevents flex overflow */
 }
 
-/* Content Header with Bottom Line */
+/* Content Header — fixed, does NOT scroll */
 .contentHeader {
   padding: 20px 28px;
-  background: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: relative;
   z-index: 5;
+  flex-shrink: 0; /* ✅ Header stays fixed */
+ 
+  backdrop-filter: blur(8px);
 }
 
 .headerLeft {
@@ -336,14 +343,13 @@
   line-height: 1;
 }
 
-/* Header Bottom Line */
 .headerBottomLine {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, 
+  background: linear-gradient(90deg,
     transparent 0%,
     #2563eb 20%,
     #3b82f6 50%,
@@ -353,29 +359,49 @@
   opacity: 0.6;
 }
 
-/* Content Wrapper */
+/* ✅ Content Wrapper — fills remaining space */
 .contentWrapper {
   display: flex;
   flex: 1;
-  overflow: hidden;
+  overflow: hidden;  /* ✅ Wrapper does NOT scroll */
   position: relative;
-  background: #f8fafc;
+  min-height: 0;     /* ✅ Critical for nested flex scroll */
 }
 
+/* ✅ contentBody — THIS scrolls independently from sidebar */
 .contentBody {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto;        /* ✅ Only this scrolls in content area */
+  overflow-x: hidden;
   padding: 28px;
-  scroll-behavior: smooth;
-  background: #f8fafc;
-  transition: all 0.3s ease;
+  scroll-behavior: smooth; /* ✅ Smooth scroll */
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+  min-height: 0;           /* ✅ Critical */
+}
+
+.contentBody::-webkit-scrollbar {
+  width: 5px;
+}
+
+.contentBody::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.contentBody::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.contentBody::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 .contentBody.withPreview {
   width: 60%;
 }
 
-/* Content Divider between Main and Preview */
 .contentDivider {
   width: 2px;
   background: linear-gradient(180deg,
@@ -386,15 +412,16 @@
   );
   height: 100%;
   margin: 0 2px;
+  flex-shrink: 0;
 }
 
-/* Preview Panel */
+/* Preview Panel — also independently scrollable */
 .previewPanel {
   width: 40%;
   background: white;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; /* ✅ Panel wrapper: no overflow */
   animation: slideIn 0.3s ease;
   border-left: 2px solid #f0f0f0;
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.03);
@@ -413,6 +440,7 @@
   justify-content: space-between;
   align-items: center;
   position: relative;
+  flex-shrink: 0; /* ✅ Fixed header */
 }
 
 .previewPanelHeader::after {
@@ -451,12 +479,16 @@
   border: 1px solid #bae6fd;
 }
 
+/* ✅ Preview content — independently scrollable */
 .previewPanelContent {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto;        /* ✅ Independent scroll */
+  overflow-x: hidden;
   padding: 24px;
+  scroll-behavior: smooth;
   scrollbar-width: thin;
   background: white;
+  min-height: 0;           /* ✅ Critical */
 }
 
 .previewPanelContent::-webkit-scrollbar {
@@ -472,7 +504,6 @@
   border-radius: 4px;
 }
 
-/* Preview Data Styles */
 .previewData {
   display: flex;
   flex-direction: column;
@@ -618,50 +649,80 @@
 @media (max-width: 768px) {
   .configContainer {
     flex-direction: column;
+    height: auto;
+    min-height: 100vh;
   }
-  
+
   .sidebar {
     width: 100%;
-    max-height: 200px;
+    height: auto;
+    max-height: 220px;
+    overflow: hidden;
   }
-  
+
+  .stepsContainer {
+    overflow-x: auto;      /* ✅ Horizontal scroll on mobile */
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: row;
+    padding: 12px;
+    gap: 8px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .stepItem {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    min-width: 140px;
+  }
+
   .verticalDivider {
     width: 100%;
     height: 2px;
     background: linear-gradient(90deg, transparent, #cbd5e1, transparent);
   }
-  
+
+  .contentArea {
+    height: auto;
+    min-height: 70vh;
+  }
+
   .contentWrapper {
     flex-direction: column;
   }
-  
+
+  .contentBody {
+    min-height: 60vh;
+  }
+
   .contentBody.withPreview {
     width: 100%;
   }
-  
+
   .contentDivider {
     width: 100%;
     height: 2px;
     background: linear-gradient(90deg, transparent, #cbd5e1, transparent);
   }
-  
+
   .previewPanel {
     width: 100%;
     border-left: none;
     border-top: 2px solid #f0f0f0;
+    max-height: 50vh;
   }
-  
+
   .contentHeader {
     flex-direction: column;
     gap: 16px;
     align-items: flex-start;
   }
-  
+
   .headerLeft {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .headerButtons {
     width: 100%;
     justify-content: flex-end;

@@ -1,403 +1,276 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState, useCallback } from 'react';
 import styles from './ChatBody.module.css';
-import { Check, CheckCheck } from 'lucide-react';
 
-const ChatBody = ({
-  messages,
-  isLoading,
-  primaryColor = '#4a6baf',
-  secondaryColor = 'tomato',
-  apiBaseUrl,
-  backendApiKey = '',
-  onPromptClick,
-  onConfirmClick,
-  onOptionSelect,
-  showConfirmButtons,
-  currentPromptFlow,
-  suggestedPrompts = [],
-  currentChildOptions = [],
-  isWebsiteActive = true,
-  websiteStatus = 'active',
-  messageAnimations = {}
-}) => {
-  const messagesEndRef = useRef(null);
-  const [websiteId, setWebsiteId] = useState('');
-  const [lastClickedKeyword, setLastClickedKeyword] = useState(null);
-  const [showMainPrompts, setShowMainPrompts] = useState(true);
-  const [isAutoClickInProgress, setIsAutoClickInProgress] = useState(false);
-  
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-useEffect(() => {
-  if (currentChildOptions.length > 0 && 
-      !showConfirmButtons &&
-      currentPromptFlow &&
-      currentPromptFlow.waitingForOption) {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  }
-}, [currentChildOptions, showConfirmButtons, currentPromptFlow]);
-  // Listen for auto-click events from ChatWidget
-  useEffect(() => {
-    const handleAutoClickEvent = (event) => {
-      if (event.detail && event.detail.type === 'userInterested' && event.detail.isAutoClick) {
-        // Auto-click detected, hide prompts immediately
-        setShowMainPrompts(false);
-        setIsAutoClickInProgress(true);
-        
-        // Reset after auto-click completes
-        setTimeout(() => {
-          setIsAutoClickInProgress(false);
-        }, 1500);
-      }
-    };
-    
-    // Listen for custom events from ChatWidget
-    window.addEventListener('userInterestDetected', handleAutoClickEvent);
-    
-    return () => {
-      window.removeEventListener('userInterestDetected', handleAutoClickEvent);
-    };
-  }, []);
+// ─── Typewriter hook ────────────────────────────────────────────
+const useTypewriter = (text, speed = 18, enabled = true) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isDone, setIsDone]               = useState(false);
+  const indexRef                          = useRef(0);
+  const intervalRef                       = useRef(null);
 
-  // Reset prompts when flow is complete or when suggestedPrompts change
   useEffect(() => {
-    // If there's a current flow, hide main prompts
-    if (currentPromptFlow) {
-      setShowMainPrompts(false);
-    } else if (showConfirmButtons) {
-      // Hide prompts when confirming
-      setShowMainPrompts(false);
-    } else if (suggestedPrompts.length === 0) {
-      // Hide if no suggested prompts
-      setShowMainPrompts(false);
-    } else if (!isAutoClickInProgress) {
-      // Show prompts when no flow, no confirmation, and not auto-clicking
-      setShowMainPrompts(true);
+    if (!enabled) {
+      setDisplayedText(text);
+      setIsDone(true);
+      return;
     }
-  }, [currentPromptFlow, showConfirmButtons, suggestedPrompts, isAutoClickInProgress]);
+    setDisplayedText('');
+    setIsDone(false);
+    indexRef.current = 0;
 
-  // Listen for message animations
+    intervalRef.current = setInterval(() => {
+      indexRef.current += 1;
+      setDisplayedText(text.slice(0, indexRef.current));
+      if (indexRef.current >= text.length) {
+        clearInterval(intervalRef.current);
+        setIsDone(true);
+      }
+    }, speed);
+
+    return () => clearInterval(intervalRef.current);
+  }, [text, speed, enabled]);
+
+  return { displayedText, isDone };
+};
+
+// ─── Single bot message with typewriter ────────────────────────
+const BotMessage = ({ message, isLatest, createdAt, onCharTyped }) => {
+  const { displayedText, isDone } = useTypewriter(message, 18, isLatest);
+
+  // Notify parent on each new char so it can scroll (if user hasn't scrolled up)
   useEffect(() => {
-    // Check if last message is from bot and has animation
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.isAdmin && messageAnimations[lastMessage.id]) {
-        // Bot is typing/showing message, keep prompts hidden
-        setShowMainPrompts(false);
-      }
-    }
-  }, [messages, messageAnimations]);
-
-  // Fetch website ID
-  useEffect(() => {
-    const fetchWebsiteData = async () => {
-      if (!backendApiKey || !apiBaseUrl) {
-        console.warn('❌ Missing API configuration');
-        return;
-      }
-
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/websites/chat-config?apiKey=${encodeURIComponent(backendApiKey)}`, {
-          method: 'GET',
-          headers: { 
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.success && data.item) {
-          const websiteData = data.item;
-          
-          if (websiteData.status === 'active') {
-            setWebsiteId(websiteData.id || '');
-          } else {
-            setWebsiteId('');
-          }
-        } else {
-          setWebsiteId('');
-          console.warn('❌ No website found with this API key:', data.error);
-        }
-      } catch (error) {
-        console.error('💥 Error checking website status:', error);
-        setWebsiteId('');
-      }
-    };
-    
-    fetchWebsiteData();
-  }, [apiBaseUrl, backendApiKey]);
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata',
-    });
-  };
-
-  const renderTicks = (status) => {
-    if (status === 'single')
-      return <Check size={14} color="#999" className={styles.tickIcon} />;
-    if (status === 'double')
-      return <CheckCheck size={14} color="#999" className={styles.tickIcon} />;
-    if (status === 'green')
-      return <CheckCheck size={14} color="#4caf50" className={styles.tickIcon} />;
-    return null;
-  };
-
-  const handleKeywordClick = (prompt) => {
-    setLastClickedKeyword(prompt);
-    setShowMainPrompts(false); // Hide immediately on click
-    onPromptClick(prompt);
-  };
-
-  const handleOptionSelect = (option) => {
-    onOptionSelect(option);
-    setShowMainPrompts(false);
-  };
-
-  const handleConfirmClick = (response) => {
-    onConfirmClick(response);
-    
-    if (response === 'No') {
-      // If user cancels, show main prompts again after delay
-      setTimeout(() => {
-        setShowMainPrompts(true);
-        setLastClickedKeyword(null);
-      }, 1000);
-    } else {
-      // If user confirms, keep prompts hidden
-      setShowMainPrompts(false);
-    }
-  };
-
-  // Determine when to show main prompts
-  const shouldShowMainPrompts = 
-    showMainPrompts && 
-    suggestedPrompts.length > 0 && 
-    !showConfirmButtons && 
-    currentChildOptions.length === 0 && 
-    !isLoading &&
-    !isAutoClickInProgress &&
-    (!currentPromptFlow || (!currentPromptFlow.waitingForOption && !currentPromptFlow.isSingleChild));
-
-  // Determine when to show child options
-  const shouldShowChildOptions = 
-    currentChildOptions.length > 1 && 
-    !showConfirmButtons &&
-    currentPromptFlow &&
-    currentPromptFlow.waitingForOption;
-
-  // Show loading indicator for auto-click
-  if (isAutoClickInProgress) {
-    return (
-      <div className={styles.chatBox}>
-        <div className={styles.messagesContainer}>
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`${styles.chatMessage} ${msg.isAdmin ? styles.admin : styles.user}`}
-              style={{
-                backgroundColor: msg.isAdmin ? '#fff' : `${primaryColor}15`,
-                border: msg.isAdmin ? 'none' : `1px solid ${primaryColor}`,
-              }}
-            >
-              <div className={styles.messageRow}>
-                <div
-                  className={styles.messageText}
-                  dangerouslySetInnerHTML={{
-                    __html: msg.message.replace(/\n/g, '<br>'),
-                  }}
-                  style={{ 
-                    color: msg.isAdmin ? '#333' : primaryColor,
-                    whiteSpace: 'pre-line'
-                  }}
-                />
-              </div>
-
-              {msg.isError && (
-                <div 
-                  className={styles.errorMessage}
-                  style={{ 
-                    color: secondaryColor,
-                    border: `1px solid ${secondaryColor}20`,
-                    backgroundColor: `${secondaryColor}10`
-                  }}
-                >
-                  ⚠️ {msg.message}
-                </div>
-              )}
-
-              <div className={styles.messageFooter}>
-                <span className={styles.messageTimestamp}>
-                  {formatTime(msg.createdAt)}
-                </span>
-                {!msg.isAdmin && renderTicks(msg.status)}
-              </div>
-            </div>
-          ))}
-
-          {/* Auto-click loading indicator */}
-          <div className={styles.autoClickIndicator}>
-            <div className={styles.autoClickSpinner} style={{ borderColor: primaryColor }} />
-            <span style={{ color: primaryColor }}>Auto-selecting relevant option...</span>
-          </div>
-
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-    );
-  }
+    if (isLatest && !isDone && onCharTyped) onCharTyped();
+  }, [displayedText]);
 
   return (
-    <div className={styles.chatBox}>
-      <div className={styles.messagesContainer}>
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`${styles.chatMessage} ${msg.isAdmin ? styles.admin : styles.user}`}
-            style={{
-              backgroundColor: msg.isAdmin ? '#fff' : `${primaryColor}15`,
-              border: msg.isAdmin ? 'none' : `1px solid ${primaryColor}`,
-            }}
-          >
-            <div className={styles.messageRow}>
-              <div
-                className={styles.messageText}
-                dangerouslySetInnerHTML={{
-                  __html: msg.message.replace(/\n/g, '<br>'),
-                }}
-                style={{ 
-                  color: msg.isAdmin ? '#333' : primaryColor,
-                  whiteSpace: 'pre-line'
-                }}
-              />
-            </div>
-
-            {msg.isError && (
-              <div 
-                className={styles.errorMessage}
-                style={{ 
-                  color: secondaryColor,
-                  border: `1px solid ${secondaryColor}20`,
-                  backgroundColor: `${secondaryColor}10`
-                }}
-              >
-                ⚠️ {msg.message}
-              </div>
-            )}
-
-            <div className={styles.messageFooter}>
-              <span className={styles.messageTimestamp}>
-                {formatTime(msg.createdAt)}
-              </span>
-              {!msg.isAdmin && renderTicks(msg.status)}
-            </div>
-          </div>
-        ))}
-
-        {isLoading && !isAutoClickInProgress && (
-          <div className={styles.typingIndicator}>
-            <div className={styles.typingDot} style={{ backgroundColor: secondaryColor }} />
-            <div className={styles.typingDot} style={{ backgroundColor: secondaryColor }} />
-            <div className={styles.typingDot} style={{ backgroundColor: secondaryColor }} />
-          </div>
-        )}
-
-        {/* Confirmation Buttons */}
-        {showConfirmButtons && (
-          <div className={styles.confirmContainer}>
-            <button
-              style={{ 
-                backgroundColor: primaryColor, 
-                color: 'white',
-                border: `1px solid ${primaryColor}`
-              }}
-              className={styles.confirmButton}
-              onClick={() => handleConfirmClick('Yes')}
-            >
-              ✅ Yes, Confirm
-            </button>
-            <button
-              style={{ 
-                backgroundColor: 'transparent', 
-                color: secondaryColor,
-                border: `1px solid ${secondaryColor}`
-              }}
-              className={styles.confirmButton}
-              onClick={() => handleConfirmClick('No')}
-            >
-              ❌ No, Cancel
-            </button>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
+    <div className={styles.messageContent}>
+      <div className={styles.messageText}>
+        {displayedText}
+        {!isDone && <span className={styles.typingCursor}>|</span>}
       </div>
-
-      {/* Child options suggestions */}
-      {shouldShowChildOptions && (
-        <div className={styles.childOptionsContainer}>
-          <div className={styles.childOptionsHeader}>
-            <span style={{ color: primaryColor }}>📋 Available Options:</span>
-          </div>
-          <div className={styles.childOptionsList}>
-            {currentChildOptions.map((option, i) => (
-              <button
-                key={i}
-                className={styles.childOptionButton}
-                style={{ 
-                  backgroundColor: primaryColor, 
-                  color: 'white',
-                  border: `1px solid ${primaryColor}`
-                }}
-                onClick={() => handleOptionSelect(option)}
-                disabled={isLoading || isAutoClickInProgress}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Main suggested prompts */}
-      {shouldShowMainPrompts && (
-        <div className={styles.keywordSuggestionsContainer}>
-          <div className={styles.keywordHeader}>
-            {/* Optional header text */}
-          </div>
-          <div className={styles.keywordList}>
-            {suggestedPrompts.map((prompt, i) => (
-              <button
-                key={i}
-                className={styles.keywordPill}
-                style={{ 
-                  backgroundColor: primaryColor, 
-                  color: 'white',
-                  border: `1px solid ${primaryColor}`
-                }}
-                onClick={() => handleKeywordClick(prompt)}
-                disabled={isLoading || isAutoClickInProgress}
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
+      {isDone && (
+        <div className={styles.messageTime}>
+          {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
     </div>
   );
 };
 
+// ─── Main ChatBody ──────────────────────────────────────────────
+const ChatBody = forwardRef((props, ref) => {
+  const {
+    messages,
+    isLoading,
+    primaryColor,
+    secondaryColor,
+    apiBaseUrl,
+    backendApiKey,
+    onPromptClick,
+    onConfirmClick,
+    onOptionSelect,
+    showConfirmButtons,
+    currentPromptFlow,
+    suggestedPrompts,
+    currentChildOptions,
+    isWebsiteActive,
+    websiteStatus,
+    messageAnimations,
+    isFullScreen,
+    isKeyboardVisible
+  } = props;
+
+  const scrollContainerRef = useRef(null);
+  const messagesEndRef     = useRef(null);
+
+  // ✅ Track if user has manually scrolled up
+  const userScrolledUpRef  = useRef(false);
+  const lastScrollTopRef   = useRef(0);
+
+  // ─── Detect manual scroll ──────────────────────────────────────
+  // If user scrolls UP → set flag. If they scroll back to bottom → clear flag.
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+
+    if (isAtBottom) {
+      userScrolledUpRef.current = false;
+    } else if (el.scrollTop < lastScrollTopRef.current) {
+      // scrolling upward
+      userScrolledUpRef.current = true;
+    }
+    lastScrollTopRef.current = el.scrollTop;
+  }, []);
+
+  // ─── Smart scroll — only if user hasn't scrolled up ───────────
+  const scrollToBottom = useCallback(() => {
+    if (userScrolledUpRef.current) return;
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, []);
+
+  // Force scroll (new message arrives — always pull to bottom & reset flag)
+  const forceScrollToBottom = useCallback(() => {
+    userScrolledUpRef.current = false;
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, []);
+
+  // Index of last bot message
+  const lastBotIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender === 'support-bot') return i;
+    }
+    return -1;
+  })();
+
+  // New message → force scroll to bottom
+  useEffect(() => {
+    forceScrollToBottom();
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (currentChildOptions && currentChildOptions.length > 0) {
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }, [currentChildOptions]);
+
+  useEffect(() => {
+    if (showConfirmButtons) setTimeout(() => scrollToBottom(), 100);
+  }, [showConfirmButtons]);
+
+  useEffect(() => {
+    if (!currentPromptFlow && suggestedPrompts && suggestedPrompts.length > 0 && !isLoading) {
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }, [suggestedPrompts, currentPromptFlow, isLoading]);
+
+  useEffect(() => {
+    if (isKeyboardVisible) setTimeout(() => forceScrollToBottom(), 300);
+  }, [isKeyboardVisible]);
+
+  // Called by BotMessage on each typed character
+  const handleCharTyped = useCallback(() => {
+    scrollToBottom(); // respects userScrolledUpRef
+  }, [scrollToBottom]);
+
+  return (
+    <div
+      className={styles.chatBody}
+      ref={(el) => {
+        scrollContainerRef.current = el;
+        if (typeof ref === 'function') ref(el);
+        else if (ref) ref.current = el;
+      }}
+      onScroll={handleScroll}
+    >
+      <div className={styles.messagesContainer}>
+        {messages.map((message, index) => (
+          <div
+            key={message.id || index}
+            className={`${styles.message} ${
+              message.sender === 'user' ? styles.userMessage : styles.botMessage
+            }`}
+          >
+            {message.sender === 'support-bot' ? (
+              <BotMessage
+                message={message.message}
+                isLatest={index === lastBotIndex && !isLoading}
+                createdAt={message.createdAt}
+                onCharTyped={handleCharTyped}
+              />
+            ) : (
+              <div className={styles.messageContent}>
+                <div className={styles.messageText}>{message.message}</div>
+                <div className={styles.messageTime}>
+                  {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Three-dot loader */}
+        {isLoading && (
+          <div className={styles.typingIndicator}>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        )}
+
+        {/* Confirm buttons */}
+        {showConfirmButtons && (
+          <div className={styles.confirmButtons}>
+            <button
+              className={styles.confirmButton}
+              style={{ backgroundColor: primaryColor }}
+              onClick={() => onConfirmClick('Yes')}
+            >
+              Yes
+            </button>
+            <button
+              className={styles.confirmButton}
+              style={{ backgroundColor: '#f44336' }}
+              onClick={() => onConfirmClick('No')}
+            >
+              No
+            </button>
+          </div>
+        )}
+
+        {/* Child options */}
+        {currentChildOptions && currentChildOptions.length > 0 && (
+          <div className={styles.optionsContainer}>
+            {currentChildOptions.map((option, index) => (
+              <button
+                key={index}
+                className={styles.optionButton}
+                style={{
+                  backgroundColor: 'white',
+                  color: primaryColor,
+                  border: `1px solid ${primaryColor}`
+                }}
+                onClick={() => onOptionSelect(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Suggested prompts */}
+        {!currentPromptFlow && suggestedPrompts && suggestedPrompts.length > 0 && !isLoading && (
+          <div className={styles.suggestedPrompts}>
+            <div className={styles.promptButtons}>
+              {suggestedPrompts.map((prompt, index) => (
+                <button
+                  key={index}
+                  className={styles.promptButton}
+                  style={{
+                    backgroundColor: 'white',
+                    color: primaryColor,
+                    border: `1px solid ${primaryColor}`
+                  }}
+                  onClick={() => onPromptClick(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} style={{ height: '1px' }} />
+      </div>
+    </div>
+  );
+});
+
+ChatBody.displayName = 'ChatBody';
 export default ChatBody;

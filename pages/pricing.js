@@ -1,201 +1,340 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/router";
-import Script from "next/script";
 import Navbar from "@/app/Navbar"; 
 import Footer from "@/app/Footer"; 
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 export default function Pricing() {
   const { data: session } = useSession();
   const router = useRouter();
   
+  const [viewMode, setViewMode] = useState("subscriptions"); // "subscriptions" | "boosters"
   const [plans, setPlans] = useState([]);
+  const [boosterPlans, setBoosterPlans] = useState([]); 
   const [processingPlanId, setProcessingPlanId] = useState(null);
+  const [userCurrency, setUserCurrency] = useState(null); 
+  const [billingCycle, setBillingCycle] = useState("monthly"); 
+  const carouselRef = useRef(null);
 
   useEffect(() => {
     fetch("/api/admin/plans")
       .then((res) => res.json())
       .then((data) => {
-        const allPlans = data.plans || [];
-        const activePlans = allPlans.filter(p => p.status === 'active');
-        // Sort by price
+        const activePlans = (data.plans || []).filter(p => p.status === 'active');
         activePlans.sort((a, b) => a.amount - b.amount);
         setPlans(activePlans);
-      })
-      .catch((err) => console.error("Failed to fetch plans:", err));
+      });
+
+    fetch("/api/admin/booster-plans")
+      .then((res) => res.json())
+      .then((data) => {
+        const activeBoosters = (data.plans || []).filter(p => p.status === 'active');
+        activeBoosters.sort((a, b) => a.amount - b.amount);
+        setBoosterPlans(activeBoosters);
+      });
+
+    fetch(`https://get.geojs.io/v1/ip/country.json?t=${new Date().getTime()}`)
+      .then((res) => res.json())
+      .then((data) => setUserCurrency(data.country === "IN" ? "INR" : "USD"))
+      .catch(() => setUserCurrency("USD"));
   }, []);
 
   const handleCheckout = async (plan) => {
-    if (!session) {
-      signIn(); 
-      return; 
-    }
+    if (!session) return signIn(); 
     setProcessingPlanId(plan.plan_id);
 
     try {
       const res = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: plan.plan_id }),
+        body: JSON.stringify({ 
+            planId: plan.plan_id, 
+            currency: userCurrency,
+            billingCycle: billingCycle 
+        }),
       });
-
+      
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Order creation failed");
+      if (!res.ok) throw new Error(data.error || "Failed to create order");
 
+      if (data.gateway === "downgrade_scheduled") {
+        alert(data.message);
+        router.push("/dashboard"); 
+        setProcessingPlanId(null);
+        return; 
+      }
+
+      if (data.gateway === "stripe") {
+        if (data.url) window.location.assign(data.url); 
+        else { alert("Stripe Checkout URL missing from response."); setProcessingPlanId(null); }
+        return; 
+      }
+
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) { alert("Failed to load Razorpay."); setProcessingPlanId(null); return; }
+      
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, 
         amount: data.amount,
-        currency: "INR",
+        currency: data.currency,
         name: "HeyAiBot",
-        description: `Subscription for ${plan.plan_name}`,
-        order_id: data.orderId,
+        description: `${plan.plan_name} Plan (${billingCycle})`,
+        // order_id: data.orderId,
+        order_id: data.gateway === 'razorpay_subscription' ? undefined : data.orderId,
+        subscription_id: data.gateway === 'razorpay_subscription' ? data.subscriptionId : undefined,
+        
         handler: async function (response) {
-          try {
-            const verifyRes = await fetch("/api/payment/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                planId: plan.plan_id 
-              })
-            });
-            
-            if(verifyRes.ok) {
-                alert("Payment Successful! Your plan is active.");
-                router.push("/dashboard");
-            } else {
-                alert("Payment verification failed.");
-            }
-          } catch (e) {
-            console.error("Verification error:", e);
-            alert("Payment verification failed.");
-          } finally {
-            setProcessingPlanId(null);
-          }
+          const verifyRes = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...response, planId: plan.plan_id, billingCycle: billingCycle }),
+          });
+          if (verifyRes.ok) router.push("/dashboard");
+          else alert("Verification failed");
         },
-        prefill: {
-          name: session.user.name,
-          email: session.user.email,
-        },
-        theme: { color: "#2563eb" },
-        modal: {
-          ondismiss: function(){ setProcessingPlanId(null); }
-        }
+        prefill: { name: session?.user?.name || "", email: session?.user?.email || "" },
+        theme: { color: "#4F46E5" },
+        modal: { ondismiss: () => setProcessingPlanId(null) }
       };
 
-      const rzp1 = new window.Razorpay(options);
-      rzp1.open();
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      rzp.on('payment.failed', () => { alert("Payment failed"); setProcessingPlanId(null); });
 
-    } catch (error) {
-      console.error("Payment Error:", error);
-      alert("Payment failed: " + error.message);
+    } catch (err) {
+      alert("Error initiating checkout: " + err.message);
       setProcessingPlanId(null);
     }
   };
 
+  const handleBoosterCheckout = async (booster) => {
+    if (!session) return signIn(); 
+    setProcessingPlanId(booster.booster_id);
+
+    try {
+      const res = await fetch("/api/payment/create-booster-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ boosterId: booster.booster_id, currency: userCurrency }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create booster order");
+
+      if (data.gateway === "stripe") {
+        if (data.url) window.location.assign(data.url); 
+        else { alert("Stripe Checkout URL missing from response."); setProcessingPlanId(null); }
+        return; 
+      }
+
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) { alert("Failed to load Razorpay."); setProcessingPlanId(null); return; }
+      
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, 
+        amount: data.amount,
+        currency: data.currency,
+        name: "HeyAiBot",
+        description: `${booster.name}`,
+        order_id: data.orderId,
+        handler: async function (response) {
+          const verifyRes = await fetch("/api/payment/verify-booster", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...response, boosterId: booster.booster_id }),
+          });
+          if (verifyRes.ok) {
+            alert("Tokens added to your wallet successfully!");
+            router.push("/dashboard");
+          } else alert("Verification failed");
+        },
+        prefill: { name: session?.user?.name || "", email: session?.user?.email || "" },
+        theme: { color: "#10B981" }, 
+        modal: { ondismiss: () => setProcessingPlanId(null) }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      rzp.on('payment.failed', () => { alert("Payment failed"); setProcessingPlanId(null); });
+
+    } catch (err) {
+      alert("Error initiating checkout: " + err.message);
+      setProcessingPlanId(null);
+    }
+  };
+
+  const scroll = (direction) => {
+    if (carouselRef.current) {
+      const scrollAmount = 350;
+      carouselRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
       <Navbar />
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
-      <main className="flex-grow">
-        {/* Header Section */}
-        <div className="bg-blue-600 py-20 px-4 text-center">
-          <h1 className="text-4xl font-extrabold text-white mb-4">Simple, Transparent Pricing</h1>
-          <p className="text-xl text-blue-100 max-w-2xl mx-auto">
-            Choose the perfect plan for your business. No hidden fees, cancel anytime.
-          </p>
-        </div>
+      <main className="flex-grow pt-20 pb-24 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-500 rounded-full blur-[120px] opacity-10 pointer-events-none"></div>
 
-        <div className="max-w-7xl mx-auto px-4 -mt-16 pb-20">
-          <div className="grid md:grid-cols-3 gap-8">
-            {plans.map((plan, index) => {
-              // Highlight the middle plan or explicitly marked plans (optional logic)
-              const isPopular = index === 1 && plans.length >= 3; 
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight mb-6">Simple, Transparent Pricing</h1>
+          <p className="text-lg text-slate-500 max-w-2xl mx-auto mb-10 font-medium">Upgrade, downgrade, or cancel anytime. No hidden fees.</p>
 
-              return (
-                <div 
-                  key={plan.plan_id} 
-                  className={`bg-white rounded-2xl shadow-xl flex flex-col relative overflow-hidden transition-transform duration-300 hover:-translate-y-2
-                    ${isPopular ? 'border-4 border-blue-500 scale-105 z-10' : 'border border-gray-100'}
-                  `}
-                >
-                  {isPopular && (
-                    <div className="bg-blue-500 text-white text-xs font-bold uppercase tracking-wider text-center py-1">
-                      Most Popular
-                    </div>
-                  )}
+          {/* MAIN TOGGLE: Subscriptions vs Boosters */}
+          <div className="flex justify-center mb-10">
+            <div className="bg-slate-200/60 p-1.5 rounded-full inline-flex items-center">
+              <button 
+                onClick={() => setViewMode("subscriptions")} 
+                className={`px-8 py-3 rounded-full text-sm font-bold transition-all ${viewMode === "subscriptions" ? "bg-white text-indigo-600 shadow-md" : "text-slate-500 hover:text-slate-800"}`}
+              >
+                Subscription Plans
+              </button>
+              <button 
+                onClick={() => setViewMode("boosters")} 
+                className={`px-8 py-3 rounded-full text-sm font-bold transition-all ${viewMode === "boosters" ? "bg-white text-emerald-600 shadow-md" : "text-slate-500 hover:text-slate-800"}`}
+              >
+                Token Boosters
+              </button>
+            </div>
+          </div>
 
-                  <div className="p-8 flex-1 flex flex-col">
-                    {/* 1. Plan Name */}
-                    <div className="mb-4">
-                      <h3 className="text-2xl font-bold text-gray-900 capitalize">{plan.plan_name}</h3>
-                      <div className="h-1 w-12 bg-blue-500 mt-2 rounded"></div>
-                    </div>
-
-                    {/* 2. Features */}
-                    <div className="flex-1 mb-8">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">
-                        Everything you get:
-                      </p>
-                      <ul className="space-y-4">
-                        <li className="flex items-center">
-                            <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center mr-3 flex-shrink-0">
-                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
-                            <span className="text-gray-700 font-medium">{plan.duration} Days Validity</span>
-                        </li>
-                        {plan.features && Object.entries(plan.features).map(([key, value]) => (
-                          <li key={key} className="flex items-start">
-                             <div className="w-6 h-6 rounded-full bg-green-50 flex items-center justify-center mr-3 flex-shrink-0">
-                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                             </div>
-                            <span className="text-gray-600">
-                              <span className="font-bold text-gray-900">{value}</span> {key}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* 3. Price & Button */}
-                    <div className="border-t border-gray-100 pt-6 mt-auto">
-                        <div className="flex items-baseline mb-6">
-                            <span className="text-5xl font-extrabold text-gray-900">₹{plan.amount}</span>
-                            <span className="text-gray-500 ml-2">/ month</span>
-                        </div>
-                        
-                        <button 
-                          onClick={() => handleCheckout(plan)}
-                          disabled={processingPlanId !== null}
-                          className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center ${
-                             processingPlanId === plan.plan_id
-                             ? "bg-blue-800 text-white cursor-wait"
-                             : processingPlanId !== null
-                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 hover:shadow-blue-300"
-                          }`}
-                        >
-                          {processingPlanId === plan.plan_id ? (
-                            <>
-                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Processing...
-                            </>
-                          ) : (
-                            "Choose Plan"
-                          )}
-                        </button>
+          {/* LOADING STATE */}
+          {(!userCurrency || (plans.length === 0 && boosterPlans.length === 0)) ? (
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
+            </div>
+          ) : (
+            <>
+              {/* =============================== */}
+              {/* VIEW 1: SUBSCRIPTION PLANS      */}
+              {/* =============================== */}
+              {viewMode === "subscriptions" && (
+                <div className="animate-in fade-in zoom-in-95 duration-300">
+                  {/* Monthly / Yearly Sub-Toggle */}
+                  <div className="flex justify-center mb-10">
+                    <div className="bg-white border border-slate-200 p-1 rounded-full inline-flex items-center shadow-sm relative">
+                      <button onClick={() => setBillingCycle("monthly")} className={`relative z-10 px-6 py-2 rounded-full text-sm font-bold transition-all ${billingCycle === "monthly" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-800"}`}>Monthly</button>
+                      <button onClick={() => setBillingCycle("yearly")} className={`relative z-10 px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === "yearly" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-800"}`}>
+                        Yearly <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Save 20%</span>
+                      </button>
                     </div>
                   </div>
+
+                  {plans.length === 0 ? (
+                    <div className="text-slate-500 font-bold p-10">No subscription plans available right now.</div>
+                  ) : (
+                    <div className="relative group max-w-6xl mx-auto">
+                      <button onClick={() => scroll('left')} className="absolute -left-4 md:-left-12 top-1/2 -translate-y-1/2 z-20 bg-white border border-slate-200 text-slate-600 p-3 lg:p-4 rounded-full shadow-xl hover:bg-slate-50 hover:text-indigo-600 hover:scale-110 transition-all opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center focus:outline-none">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg>
+                      </button>
+
+                      <div ref={carouselRef} className="flex gap-6 overflow-x-auto snap-x snap-mandatory py-6 px-4 sm:px-8 items-stretch [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                        {plans.map((plan, index) => {
+                          const isPopular = index === 1; 
+                          const isINR = userCurrency === "INR";
+                          const currencySymbol = isINR ? "₹" : "$";
+                          
+                          let mrp = Number(isINR ? (plan.amount_mrp || plan.amount) : (plan.amount_mrp_usd || plan.amount_usd));
+                          let sellingPrice = Number(isINR ? plan.amount : plan.amount_usd);
+                          
+                          if (billingCycle === 'yearly') {
+                            const discountPercent = Number(plan.yearly_discount) || 20;
+                            mrp = mrp * 12;
+                            sellingPrice = (sellingPrice * 12) * ((100 - discountPercent) / 100);
+                            sellingPrice = isINR ? Math.round(sellingPrice) : parseFloat(sellingPrice.toFixed(2));
+                          }
+
+                          const hasDiscount = mrp > sellingPrice;
+                          const featuresList = plan.display_features?.length > 0 ? plan.display_features : Object.entries(plan.features || {}).map(([k,v]) => `${v} ${k}`);
+
+                          return (
+                            <div key={plan.plan_id} className={`relative min-w-[300px] max-w-[340px] w-full shrink-0 snap-center flex flex-col bg-white rounded-3xl transition-transform duration-300 hover:-translate-y-2 ${isPopular ? "border-2 border-indigo-600 shadow-2xl shadow-indigo-600/20" : "border border-slate-200 shadow-xl shadow-slate-200/50"}`}>
+                              {isPopular && <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2"><span className="bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest py-1.5 px-4 rounded-full shadow-md">Most Popular</span></div>}
+
+                              <div className="p-8 border-b border-slate-100 text-left flex-1">
+                                <h2 className="text-2xl font-black text-slate-900 capitalize mb-4">{plan.plan_name}</h2>
+                                <div className="mb-6 h-16 flex flex-col justify-end">
+                                  {hasDiscount && <span className="text-lg font-bold text-slate-400 line-through mb-1 block">{currencySymbol}{mrp}</span>}
+                                  <div><span className="text-5xl font-black text-slate-900">{currencySymbol}{sellingPrice}</span><span className="text-slate-500 font-medium ml-1">/{billingCycle === 'yearly' ? 'yr' : 'mo'}</span></div>
+                                </div>
+                                <button onClick={() => handleCheckout(plan)} disabled={processingPlanId !== null} className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all flex justify-center items-center shadow-md ${isPopular ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-slate-900 text-white hover:bg-slate-800"} ${processingPlanId === plan.plan_id ? "opacity-75 cursor-wait" : ""}`}>
+                                  {processingPlanId === plan.plan_id ? "Processing..." : "Get Started"}
+                                </button>
+                              </div>
+                              <div className="p-8 bg-slate-50/50 rounded-b-3xl text-left flex-1">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">What&apos;s included</p>
+                                <ul className="space-y-4">
+                                  {featuresList.map((text, idx) => <li key={idx} className="flex items-start gap-3"><svg className="h-6 w-6 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg><span className="text-slate-600 font-medium">{text}</span></li>)}
+                                </ul>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <button onClick={() => scroll('right')} className="absolute -right-4 md:-right-12 top-1/2 -translate-y-1/2 z-20 bg-white border border-slate-200 text-slate-600 p-3 lg:p-4 rounded-full shadow-xl hover:bg-slate-50 hover:text-indigo-600 hover:scale-110 transition-all opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center focus:outline-none">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7"></path></svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+              )}
+
+              {/* =============================== */}
+              {/* VIEW 2: TOKEN BOOSTERS          */}
+              {/* =============================== */}
+              {viewMode === "boosters" && (
+                <div className="animate-in fade-in zoom-in-95 duration-300 max-w-5xl mx-auto pt-6">
+                  {boosterPlans.length === 0 ? (
+                    <div className="text-slate-500 font-bold p-10">No booster packs available right now.</div>
+                  ) : (
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 justify-center">
+                      {boosterPlans.map((booster) => {
+                        const isINR = userCurrency === "INR";
+                        const currencySymbol = isINR ? "₹" : "$";
+                        const price = isINR ? booster.amount : booster.amount_usd;
+
+                        return (
+                          <div key={booster.booster_id} className="bg-white border border-emerald-100 shadow-lg shadow-emerald-900/5 rounded-3xl p-8 flex flex-col hover:-translate-y-1 transition-transform">
+                            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl mb-4 mx-auto">🚀</div>
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">{booster.name}</h3>
+                            <div className="text-3xl font-black text-emerald-600 mb-6">+{booster.token_amount?.toLocaleString()} <span className="text-lg text-emerald-700/70 font-bold">Tokens</span></div>
+                            
+                            <div className="mt-auto mb-6">
+                              <span className="text-4xl font-black text-slate-900">{currencySymbol}{price}</span>
+                              <span className="text-slate-500 font-medium ml-1">/ one-time</span>
+                            </div>
+
+                            <button onClick={() => handleBoosterCheckout(booster)} disabled={processingPlanId !== null} className={`w-full py-3.5 px-6 rounded-xl font-bold transition-all flex justify-center items-center shadow-md bg-emerald-600 text-white hover:bg-emerald-700 ${processingPlanId === booster.booster_id ? "opacity-75 cursor-wait" : ""}`}>
+                              {processingPlanId === booster.booster_id ? "Processing..." : "Buy Tokens"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          
+          <div className="mt-16 flex justify-center items-center gap-2 text-slate-500 font-medium text-sm">
+             <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+             Secure payments processed by Razorpay & Stripe
           </div>
+
         </div>
       </main>
       <Footer />

@@ -7,7 +7,7 @@ import config from '../utils/config';
 
 const CodePopup = ({ website, onClose }) => {
   const [formData, setFormData] = useState({
-    superAdminChatUrl: '',
+   
     integrationCode: ''
   });
   const [copiedField, setCopiedField] = useState(null);
@@ -40,7 +40,7 @@ const CodePopup = ({ website, onClose }) => {
 
   const initializeFormData = () => {
     if (website?.apiKey && !isInitialized) {
-      const superAdminChatUrl = `${BASE_URL}/Chatpanel/AdminChatRequests/${website.apiKey}`;
+    
       const integrationCode = `<script
   src="${BASE_URL}/widget.js"
   data-app-id="${website.apiKey}"
@@ -49,7 +49,7 @@ const CodePopup = ({ website, onClose }) => {
 ></script>`;
       
       setFormData({
-        superAdminChatUrl,
+       
         integrationCode
       });
       setIsInitialized(true);
@@ -112,29 +112,7 @@ const CodePopup = ({ website, onClose }) => {
 
         <div className={styles.codePopupContent}>
           <div className={styles.formSection}>
-            <div className={styles.inputGroup}>
-              <label className={styles.inputLabel}>
-                Admin Chat Request URL
-                {formData.superAdminChatUrl && (
-                  <motion.button
-                    type="button"
-                    className={`${styles.fieldCopyButton} ${copiedField === 'superAdminChatUrl' ? styles.copied : ''}`}
-                    onClick={() => handleCopyToClipboard(formData.superAdminChatUrl, 'superAdminChatUrl')}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {copiedField === 'superAdminChatUrl' ? (
-                      <FaCheckDouble className={styles.checkIcon} />
-                    ) : (
-                      <FaCopy />
-                    )}
-                  </motion.button>
-                )}
-              </label>
-              <div className={styles.readonlyField}>
-                {formData.superAdminChatUrl}
-              </div>
-            </div>
+           
 
             <div className={styles.inputGroup}>
               <label className={styles.inputLabel}>

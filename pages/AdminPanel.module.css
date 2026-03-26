@@ -26,7 +26,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   height: auto; /* Changed to auto for dynamic height */
-  min-height: 160px; /* Minimum height */
+
   display: flex;
   flex-direction: column;
 }
@@ -214,8 +214,8 @@
 }
 /* Header Bottom Section - Actions */
 .headerBottom {
-  padding: 16px 24px;
-  background: rgba(0, 0, 0, 0.05);
+  padding: 7px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   height: auto;
   min-height: 80px;
@@ -481,15 +481,13 @@
 
 /* MAIN CONTENT AREA - Dynamic margin based on header height */
 .adminContent {
-  margin-top: 160px; /* DEFAULT HEADER HEIGHT without upgrade prompt */
-  padding: 30px;
+  margin-top: 80px; /* DEFAULT HEADER HEIGHT without upgrade prompt */
+ 
   min-height: calc(100vh - 160px);
   box-sizing: border-box;
   animation: fadeIn 0.5s ease;
   overflow-y: auto;
-  background: white;
-  /* border-radius: 20px 20px 0 0; */
-  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.1);
+
   position: relative;
   z-index: 1;
   transition: margin-top 0.3s ease; /* Smooth transition when upgrade shows */
@@ -579,6 +577,7 @@
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+  margin-top: 10px;
 }
 
 .emptyStateButton:hover {
@@ -1030,11 +1029,11 @@
 /* Large Desktop (1400px and above) */
 @media (min-width: 1400px) {
   .adminContent {
-    max-width: 1400px;
+    
     margin-left: auto;
     margin-right: auto;
-    padding: 40px;
-    border-radius: 25px 25px 0 0;
+   
+  
   }
   
   .adminContent.withUpgrade {
@@ -1188,3 +1187,107 @@
 
 /* Smooth Scrolling */
 
+/* Dashboard Button - Matching Theme Colors (Purple Gradient) */
+.dashboardButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  letter-spacing: 0.5px;
+  margin-right: 8px;
+}
+
+.dashboardButton:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.dashboardButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.dashboardIcon {
+  font-size: 18px;
+  animation: gentlePulse 2s infinite;
+}
+
+@keyframes gentlePulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.dashboardText {
+  display: inline;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .dashboardButton {
+    padding: 10px 16px;
+    margin-right: 6px;
+  }
+  
+  .dashboardText {
+    display: none;
+  }
+  
+  .dashboardIcon {
+    font-size: 16px;
+    margin: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboardButton {
+    padding: 10px 14px;
+    margin-right: 4px;
+  }
+  
+  .dashboardIcon {
+    font-size: 16px;
+  }
+}
+
+/* For very small screens */
+@media (max-width: 360px) {
+  .dashboardButton {
+    padding: 8px 12px;
+  }
+}
+
+/* Focus state for accessibility */
+.dashboardButton:focus {
+  outline: none;
+  ring: 2px solid #667eea;
+  ring-offset: 2px;
+}
+
+/* Active state when pressed */
+.dashboardButton:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* Disabled state if needed */
+.dashboardButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}

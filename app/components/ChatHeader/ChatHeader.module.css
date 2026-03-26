@@ -1,8 +1,14 @@
+/* ChatHeader.module.css */
+
 .chatHeader {
   padding: 12px 16px;
   color: white;
   border-radius: none;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0; /* Prevent header from shrinking */
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .headerContent {
@@ -23,14 +29,17 @@
   width: 40px;
   height: 40px;
   background: #fff;
-   
-    border-radius: 50%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .medicalAvatar {
   font-size: 28px;
   line-height: 1;
-  top:2px
+  position: relative;
+  top: 2px;
 }
 
 .statusIndicator {
@@ -51,12 +60,14 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  color: white;
 }
 
-.subtitle {
+.statusText {
   margin: 0;
   font-size: 12px;
   opacity: 0.9;
+  font-weight: 500;
 }
 
 .headerActions {
@@ -65,16 +76,11 @@
   gap: 12px;
 }
 
-.connectionStatus {
-  font-size: 12px;
-  font-weight: 500;
-}
-
 .closeButton {
   background: transparent;
   width: 32px;
   height: 32px;
-  border: none ;
+  border: none;
   font-size: 22px;
   font-weight: bold;
   cursor: pointer;
@@ -82,15 +88,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: white;
 }
 
 .closeButton:hover {
- 
-  transform: scale(2);
+  transform: scale(1.1);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
 }
+
+/* Hide close button on desktop by default */
 @media (min-width: 769px) {
   .headerActions {
     display: none;
-    border-radius: 12px 12px 0 0;
+  }
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .chatHeader {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-radius: 0;
   }
 }

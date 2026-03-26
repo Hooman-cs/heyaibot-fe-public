@@ -3,28 +3,18 @@ import styles from './Step.module.css';
 import { FaPlus, FaEdit, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 
 const KnowledgeBase = ({ config, setConfig }) => {
-  const [tempCategory, setTempCategory] = useState('');
   const [tempRole, setTempRole] = useState('');
   const [tempRoleValue, setTempRoleValue] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
-  const [editingCategory, setEditingCategory] = useState(null);
   const [editingRole, setEditingRole] = useState(null);
   const [editingValue, setEditingValue] = useState(null);
-  const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [showRoleInput, setShowRoleInput] = useState(false);
   const [showValueInput, setShowValueInput] = useState(false);
 
-  const categoryInputRef = useRef(null);
   const roleInputRef = useRef(null);
   const valueInputRef = useRef(null);
 
   // Focus inputs
-  useEffect(() => {
-    if (showCategoryInput && categoryInputRef.current) {
-      categoryInputRef.current.focus();
-    }
-  }, [showCategoryInput]);
-
   useEffect(() => {
     if (showRoleInput && roleInputRef.current) {
       roleInputRef.current.focus();
@@ -37,43 +27,15 @@ const KnowledgeBase = ({ config, setConfig }) => {
     }
   }, [showValueInput]);
 
-  // Categories Management
-  const addCategory = () => {
-    if (tempCategory.trim()) {
+  // Initialize aifuture array if it doesn't exist
+  useEffect(() => {
+    if (!config.aifuture) {
       setConfig(prev => ({
         ...prev,
-        category: [...(prev.category || []), tempCategory.trim()]
+        aifuture: []
       }));
-      setTempCategory('');
-      setShowCategoryInput(false);
     }
-  };
-
-  const updateCategory = (index, newValue) => {
-    if (newValue.trim()) {
-      const updated = [...config.category];
-      updated[index] = newValue.trim();
-      setConfig(prev => ({ ...prev, category: updated }));
-    }
-    setEditingCategory(null);
-    setTempCategory('');
-  };
-
-  const deleteCategory = (index) => {
-    const updated = config.category.filter((_, i) => i !== index);
-    setConfig(prev => ({ ...prev, category: updated }));
-  };
-
-  const startEditCategory = (index, value) => {
-    setEditingCategory({ index, value });
-    setTempCategory(value);
-  };
-
-  const cancelEditCategory = () => {
-    setEditingCategory(null);
-    setTempCategory('');
-    setShowCategoryInput(false);
-  };
+  }, [config.aifuture, setConfig]);
 
   // Roles Management
   const addRole = () => {
@@ -128,22 +90,34 @@ const KnowledgeBase = ({ config, setConfig }) => {
     setShowRoleInput(false);
   };
 
-  // Role Values Management
+  // Role Values Management - FIXED VERSION
   const addRoleValue = () => {
     if (selectedRole && tempRoleValue.trim()) {
       setConfig(prev => {
-        const aifuture = [...(prev.aifuture || [])];
-        const roleIndex = aifuture.findIndex(item => item.title === selectedRole);
+        // Ensure aifuture exists
+        const currentAifuture = prev.aifuture || [];
+        const aifuture = [...currentAifuture];
         
-        if (roleIndex !== -1) {
-          const values = aifuture[roleIndex].value || [];
-          if (!values.includes(tempRoleValue.trim())) {
-            aifuture[roleIndex] = {
-              ...aifuture[roleIndex],
-              value: [...values, tempRoleValue.trim()]
-            };
-          }
+        // Find the role index
+        let roleIndex = aifuture.findIndex(item => item.title === selectedRole);
+        
+        // If role doesn't exist in aifuture, create it
+        if (roleIndex === -1) {
+          aifuture.push({ title: selectedRole, value: [] });
+          roleIndex = aifuture.length - 1;
         }
+        
+        // Get current values (ensure it's an array)
+        const currentValues = aifuture[roleIndex].value || [];
+        
+        // Add new value if it doesn't already exist
+        if (!currentValues.includes(tempRoleValue.trim())) {
+          aifuture[roleIndex] = {
+            ...aifuture[roleIndex],
+            value: [...currentValues, tempRoleValue.trim()]
+          };
+        }
+        
         return { ...prev, aifuture };
       });
       setTempRoleValue('');
@@ -199,99 +173,17 @@ const KnowledgeBase = ({ config, setConfig }) => {
   };
 
   const getRoleValues = (role) => {
+    if (!role) return [];
     const roleItem = (config.aifuture || []).find(item => item.title === role);
-    return roleItem ? roleItem.value : [];
+    // Ensure we always return an array, even if value is undefined/null
+    return roleItem ? (roleItem.value || []) : [];
   };
 
   return (
     <div className={styles.knowledgeBase}>
-      <div className={styles.threeColumnLayout}>
+      <div className={styles.twoColumnLayout}>
         
-        {/* Column 1: Categories */}
-        <div className={styles.column}>
-          <div className={styles.columnHeader}>
-            <h3>Categories</h3>
-            <span className={styles.count}>{config.category?.length || 0}</span>
-          </div>
-          
-          {/* Scrollable Categories List */}
-          <div className={styles.columnContent}>
-            <div className={styles.itemsList}>
-              {config.category && config.category.length > 0 ? (
-                config.category.map((cat, index) => (
-                  <div key={index} className={styles.itemRow}>
-                    {editingCategory?.index === index ? (
-                      <div className={styles.editRow}>
-                        <input
-                          ref={categoryInputRef}
-                          type="text"
-                          value={tempCategory}
-                          onChange={(e) => setTempCategory(e.target.value)}
-                          onBlur={() => updateCategory(index, tempCategory)}
-                          onKeyPress={(e) => e.key === 'Enter' && updateCategory(index, tempCategory)}
-                          className={styles.editInput}
-                        />
-                        <div className={styles.rowActions}>
-                          <button onClick={() => updateCategory(index, tempCategory)} className={styles.saveBtn}>
-                            <FaCheck />
-                          </button>
-                          <button onClick={cancelEditCategory} className={styles.cancelBtn}>
-                            <FaTimes />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <span className={styles.itemText}>{cat}</span>
-                        <div className={styles.rowActions}>
-                          <button onClick={() => startEditCategory(index, cat)} className={styles.iconBtn}>
-                            <FaEdit />
-                          </button>
-                          <button onClick={() => deleteCategory(index)} className={styles.iconBtn}>
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className={styles.emptyState}>No categories added</div>
-              )}
-            </div>
-          </div>
-          
-          {/* Fixed Add Button at Bottom */}
-          <div className={styles.columnFooter}>
-            {!showCategoryInput ? (
-              <button 
-                className={styles.addFooterBtn}
-                onClick={() => setShowCategoryInput(true)}
-              >
-                <FaPlus /> Add Category
-              </button>
-            ) : (
-              <div className={styles.addInputFooter}>
-                <input
-                  ref={categoryInputRef}
-                  type="text"
-                  value={tempCategory}
-                  onChange={(e) => setTempCategory(e.target.value)}
-                  placeholder="Enter category name"
-                  onKeyPress={(e) => e.key === 'Enter' && addCategory()}
-                />
-                <button onClick={addCategory} className={styles.addBtn} disabled={!tempCategory.trim()}>
-                  Add
-                </button>
-                <button onClick={cancelEditCategory} className={styles.cancelBtn}>
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Column 2: Roles */}
+        {/* Column 1: Roles */}
         <div className={styles.column}>
           <div className={styles.columnHeader}>
             <h3>Roles</h3>
@@ -382,7 +274,7 @@ const KnowledgeBase = ({ config, setConfig }) => {
           </div>
         </div>
 
-        {/* Column 3: Role Values */}
+        {/* Column 2: Role Values */}
         <div className={styles.column}>
           <div className={styles.columnHeader}>
             <h3>
@@ -443,11 +335,11 @@ const KnowledgeBase = ({ config, setConfig }) => {
                 )}
               </div>
             ) : (
-              <div className={styles.emptyState}>Select a role from column 2 to add values</div>
+              <div className={styles.emptyState}>Select a role to add values</div>
             )}
           </div>
           
-          {/* Fixed Add Button at Bottom - Only show when role selected */}
+          {/* Fixed Add Button at Bottom - Always show when role selected */}
           {selectedRole && (
             <div className={styles.columnFooter}>
               {!showValueInput ? (

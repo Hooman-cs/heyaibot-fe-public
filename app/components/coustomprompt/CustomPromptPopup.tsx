@@ -101,7 +101,21 @@ const CustomPromptPopup = ({
     }));
   }
 
+  // CustomPromptPopup component ke andar
+
+useEffect(() => {
+  // Add class to body when popup opens
+  document.body.classList.add('custom-prompt-popup-open');
   
+  // Also add inline style to ensure no scrolling
+  document.body.style.overflow = 'hidden';
+  
+  // Remove when popup closes
+  return () => {
+    document.body.classList.remove('custom-prompt-popup-open');
+    document.body.style.overflow = '';
+  };
+}, []);
   useEffect(() => {
     async function load() {
       setIsLoadingData(true)
