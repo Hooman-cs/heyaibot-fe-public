@@ -1,38 +1,157 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import WebsiteConfig  from '../app/components/AuthorForm';
-import WebsiteList    from '../app/components/AuthorList';
-import styles         from './AdminPanel.module.css';
-import config         from '../app/components/utils/config';
-import { signOut }    from 'next-auth/react';
-import PlanLimitModal from '../app/components/PlanLimitModal';
+import WebsiteConfig from '../app/components/AuthorForm';
+import WebsiteList   from '../app/components/AuthorList';
+import styles        from './AdminPanel.module.css';
+import config        from '../app/components/utils/config';
+import { signOut }   from 'next-auth/react';
 
 const API_URL         = `${config.apiBaseUrl}/api/websites`;
 const MAX_BOT_API_URL = '/api/user/max-bot';
 const SESSION_API_URL = '/api/auth/session';
-const POLL_INTERVAL   = 8000;
+const POLL_INTERVAL   = 5000;
 
+// ─────────────────────────────────────────────
+// PLAN-LIMIT SELECTION MODAL
+// Shows when activeCount > maxBot on load
+// ─────────────────────────────────────────────
+const PlanLimitModal = ({ bots, maxBot, onConfirm }) => {
+  const [selected, setSelected] = useState(
+    // Pre-select the first `maxBot` active bots
+    bots
+      .filter(b => b.status === 'active')
+      .slice(0, maxBot)
+      .map(b => b.id)
+  );
+
+  const toggle = (id) => {
+    setSelected(prev =>
+      prev.includes(id)
+        ? prev.filter(x => x !== id)           // deselect
+        : prev.length < maxBot
+          ? [...prev, id]                       // select if under limit
+          : prev                               // already at limit – ignore
+    );
+  };
+
+  return (
+    <div style={overlay}>
+      <div style={modal}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+        <h2 style={{ margin: '0 0 6px', fontSize: 18, color: '#1e293b' }}>
+          Plan Limit Exceeded
+        </h2>
+        <p style={{ margin: '0 0 16px', fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+          Your current plan allows <strong>{maxBot}</strong> active bot{maxBot > 1 ? 's' : ''}.
+          You have <strong>{bots.filter(b => b.status === 'active').length}</strong> active.
+          Please select <strong>{maxBot}</strong> bot{maxBot > 1 ? 's' : ''} to keep active —
+          the rest will be disabled.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          {bots.map(bot => {
+            const isChecked = selected.includes(bot.id);
+            const isDisabled = !isChecked && selected.length >= maxBot;
+            return (
+              <label
+                key={bot.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: `2px solid ${isChecked ? '#6366f1' : '#e2e8f0'}`,
+                  background: isChecked ? '#eef2ff' : '#f8fafc',
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isDisabled ? 0.5 : 1,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  disabled={isDisabled}
+                  onChange={() => toggle(bot.id)}
+                  style={{ accentColor: '#6366f1', width: 16, height: 16 }}
+                />
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>
+                    {bot.websiteName}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {bot.websiteUrl?.replace(/^https?:\/\//, '')}
+                  </div>
+                </div>
+                {isChecked && (
+                  <span style={{
+                    background: '#6366f1', color: '#fff',
+                    borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700
+                  }}>
+                    KEEP ACTIVE
+                  </span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+
+        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>
+          {selected.length} / {maxBot} selected
+        </div>
+
+        <button
+          onClick={() => onConfirm(selected)}
+          disabled={selected.length !== maxBot}
+          style={{
+            width: '100%', padding: '12px',
+            background: selected.length === maxBot ? '#6366f1' : '#c7d2fe',
+            color: '#fff', border: 'none', borderRadius: 10,
+            fontSize: 15, fontWeight: 700, cursor: selected.length === maxBot ? 'pointer' : 'not-allowed',
+            transition: 'background 0.2s',
+          }}
+        >
+          Confirm Selection
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const overlay = {
+  position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  zIndex: 9999, padding: 16,
+};
+const modal = {
+  background: '#fff', borderRadius: 16, padding: 28,
+  maxWidth: 460, width: '100%', textAlign: 'center',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+  maxHeight: '90vh', overflowY: 'auto',
+};
+
+// ─────────────────────────────────────────────
+// ADMIN PANEL
+// ─────────────────────────────────────────────
 const AdminPanel = () => {
   const router = useRouter();
 
-  const [items, setItems]                         = useState([]);
-  const [editingId, setEditingId]                 = useState(null);
-  const [showForm, setShowForm]                   = useState(false);
-  const [loading, setLoading]                     = useState(true);
-  const [saving, setSaving]                       = useState(false);
-  const [error, setError]                         = useState(null);
-  const [userData, setUserData]                   = useState(null);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [items, setItems]                           = useState([]);
+  const [editingId, setEditingId]                   = useState(null);
+  const [showForm, setShowForm]                     = useState(false);
+  const [loading, setLoading]                       = useState(true);
+  const [saving, setSaving]                         = useState(false);
+  const [error, setError]                           = useState(null);
+  const [userData, setUserData]                     = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm]   = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
-  const [authToken, setAuthToken]                 = useState(null);
-  const [tokenExpiryTime, setTokenExpiryTime]     = useState(null);
-  const [timeRemaining, setTimeRemaining]         = useState(null);
-  const [isTokenValidated, setIsTokenValidated]   = useState(false);
+  const [authToken, setAuthToken]                   = useState(null);
+  const [tokenExpiryTime, setTokenExpiryTime]       = useState(null);
+  const [timeRemaining, setTimeRemaining]           = useState(null);
+  const [isTokenValidated, setIsTokenValidated]     = useState(false);
 
-  // Plan-limit modal
-  const [showPlanModal, setShowPlanModal] = useState(false);
-  const [planModalBots, setPlanModalBots] = useState([]);
+  // ── NEW: plan-limit modal state ──
+  const [showPlanModal, setShowPlanModal]           = useState(false);
+  const [planModalBots, setPlanModalBots]           = useState([]);
 
   const validationInProgress = useRef(false);
   const tokenCheckedRef      = useRef(false);
@@ -42,30 +161,11 @@ const AdminPanel = () => {
   const pollRef              = useRef(null);
   const userDataRef          = useRef(null);
   const authTokenRef         = useRef(null);
-  const modalOpenRef         = useRef(false);
-
-  // pollStarted ref to ensure only one interval is created
-  const pollStarted = useRef(false);
+  // Track whether plan enforcement has already run this session
+  const planEnforcedRef      = useRef(false);
 
   userDataRef.current  = userData;
   authTokenRef.current = authToken;
-
-  // Sync modalOpenRef with showPlanModal state
-  useEffect(() => {
-    modalOpenRef.current = showPlanModal;
-
-    // Modal open → scroll off, Modal close → scroll back
-    if (showPlanModal) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-
-    // Cleanup: restore scroll on component unmount
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [showPlanModal]);
 
   const [configData, setConfigData] = useState({
     websiteName: '', websiteUrl: '', category: [],
@@ -81,14 +181,14 @@ const AdminPanel = () => {
   // ── SESSION ──
   const fetchSessionData = useCallback(async () => {
     try {
-      const res = await fetch(SESSION_API_URL, {
+      const response = await fetch(SESSION_API_URL, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         cache: 'no-store'
       });
-      if (!res.ok) return null;
-      return await res.json();
+      if (!response.ok) return null;
+      return await response.json();
     } catch { return null; }
   }, []);
 
@@ -97,15 +197,15 @@ const AdminPanel = () => {
     if (apiCallInProgress.current) return null;
     try {
       apiCallInProgress.current = true;
-      const res = await fetch(MAX_BOT_API_URL, {
+      const response = await fetch(MAX_BOT_API_URL, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         cache: 'no-store'
       });
 
-      if (!res.ok) {
-        if (res.status === 401) {
+      if (!response.ok) {
+        if (response.status === 401) {
           sessionStorage.removeItem('adminAuthToken');
           window.location.replace('/login');
           return null;
@@ -113,7 +213,7 @@ const AdminPanel = () => {
         return null;
       }
 
-      const data        = await res.json();
+      const data        = await response.json();
       const sessionData = await fetchSessionData();
       let planName = 'Free Plan', hasPlan = false;
 
@@ -129,26 +229,24 @@ const AdminPanel = () => {
         return data;
       }
 
-      setUserData(prev =>
-        prev ? { ...prev, maxBot: data.maxBot || 0, plan: hasPlan, planName } : prev
-      );
+      setUserData(prev => prev ? { ...prev, maxBot: data.maxBot || 0, plan: hasPlan, planName } : prev);
       return data;
     } catch { return null; }
     finally { apiCallInProgress.current = false; }
   }, [fetchSessionData]);
 
-  // ── TOKEN ──
+  // ── TOKEN VALIDATION ──
   const validateTokenWithServer = useCallback(async (token) => {
     if (!token) return null;
     try {
-      const res = await fetch('/api/verify-token', {
+      const response = await fetch('/api/verify-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
         cache: 'no-store'
       });
-      if (!res.ok) return null;
-      const data = await res.json();
+      if (!response.ok) return null;
+      const data = await response.json();
       return (data.valid && data.payload) ? data.payload : null;
     } catch { return null; }
   }, []);
@@ -190,6 +288,10 @@ const AdminPanel = () => {
       }
 
       const remaining = payload.exp - currentTime;
+      const hours     = Math.floor(remaining / 3600);
+      const minutes   = Math.floor((remaining % 3600) / 60);
+      const seconds   = remaining % 60;
+
       const sessionData = await fetchSessionData();
       let planName = 'Free Plan', hasPlan = false;
       if (sessionData?.user) {
@@ -200,17 +302,13 @@ const AdminPanel = () => {
       return {
         userId: payload.userId || payload.sub,
         planId: payload.planId,
-        plan: hasPlan, planName,
+        plan: hasPlan,
+        planName,
         maxBot: 1,
         token,
         iat: payload.iat,
         exp: payload.exp,
-        timeRemaining: {
-          hours:   Math.floor(remaining / 3600),
-          minutes: Math.floor((remaining % 3600) / 60),
-          seconds: remaining % 60,
-          total:   remaining
-        }
+        timeRemaining: { hours, minutes, seconds, total: remaining }
       };
     } catch { return null; }
     finally { validationInProgress.current = false; }
@@ -219,11 +317,13 @@ const AdminPanel = () => {
   // ── INITIAL AUTH ──
   useEffect(() => {
     let mounted = true;
+
     const blockBack = () => {
       const token = sessionStorage.getItem('adminAuthToken');
       if (!token) window.location.replace('/login');
       else window.history.pushState(null, '', window.location.href);
     };
+
     window.history.pushState(null, '', window.location.href);
     window.addEventListener('popstate', blockBack);
 
@@ -235,6 +335,7 @@ const AdminPanel = () => {
         const userDataObj = await validateAndSetupToken();
         if (!mounted) return;
         if (!userDataObj) { window.location.replace('/login'); return; }
+
         setUserData(userDataObj);
         setAuthToken(userDataObj.token);
         setTokenExpiryTime(userDataObj.exp);
@@ -254,6 +355,14 @@ const AdminPanel = () => {
       window.removeEventListener('popstate', blockBack);
     };
   }, [validateAndSetupToken, fetchMaxBotLimit]);
+
+  // ── MAX-BOT REFRESH ──
+  useEffect(() => {
+    if (!authToken || !userData || !isTokenValidated) return;
+    if (expiryCheckInterval.current) clearInterval(expiryCheckInterval.current);
+    expiryCheckInterval.current = setInterval(() => fetchMaxBotLimit(), 30000);
+    return () => { if (expiryCheckInterval.current) clearInterval(expiryCheckInterval.current); };
+  }, [authToken, userData, isTokenValidated, fetchMaxBotLimit]);
 
   // ── SESSION TIMER ──
   useEffect(() => {
@@ -279,28 +388,23 @@ const AdminPanel = () => {
   }, [userData]);
 
   // ─────────────────────────────────────────────────────────────
-  // PLAN ENFORCEMENT
-  //
-  // activeCount > maxBot  → modal OPEN
-  // activeCount <= maxBot → modal CLOSE
-  // Modal open → items/bots freeze (poll skip)
+  // PLAN ENFORCEMENT — runs once after first fetch completes
+  // If activeCount > maxBot → show modal to pick which to keep
   // ─────────────────────────────────────────────────────────────
-  const checkAndEnforcePlanLimit = useCallback((fetchedItems, maxBot) => {
+  const enforcePlanLimit = useCallback((fetchedItems, maxBot) => {
+    if (planEnforcedRef.current) return;          // only once per session
     if (!maxBot || maxBot <= 0) return;
 
-    const activeCount = fetchedItems.filter(b => b.status === 'active').length;
+    const activeBots  = fetchedItems.filter(b => b.status === 'active');
+    const activeCount = activeBots.length;
 
+    // If active bots exceed plan limit → show selection modal
     if (activeCount > maxBot) {
-      // Limit exceeded — open modal if not already open
-      if (!modalOpenRef.current) {
-        setPlanModalBots(fetchedItems);
-        setShowPlanModal(true);
-      }
+      planEnforcedRef.current = true;             // mark as checked
+      setPlanModalBots(fetchedItems);             // pass ALL bots (only active shown selectable)
+      setShowPlanModal(true);
     } else {
-      // Limit is fine — close modal if open
-      if (modalOpenRef.current) {
-        setShowPlanModal(false);
-      }
+      planEnforcedRef.current = true;             // no issue, mark done
     }
   }, []);
 
@@ -309,9 +413,6 @@ const AdminPanel = () => {
     const ud    = userDataRef.current;
     const token = authTokenRef.current;
     if (!ud || !token || !isTokenValidated) return;
-
-    // Modal open → silent poll skip — bots freeze
-    if (silent && modalOpenRef.current) return;
 
     try {
       const res = await fetch(`${API_URL}/user/${ud.userId}/websites`, {
@@ -334,127 +435,95 @@ const AdminPanel = () => {
 
       const processed = (data.items || data.data || []).map(item => ({
         ...item,
-        roles:        item.role || item.roles || [],
-        aifuture:     item.aifuture || [],
+        roles:    item.role    || item.roles    || [],
+        aifuture: item.aifuture || [],
+        // Restore planDisabled flag from backend if present, else default false
         planDisabled: item.planDisabled || false,
       }));
 
-      // Update items only when modal is closed
-      if (!modalOpenRef.current) {
-        setItems(prev => {
-          if (!silent) return processed;
-          const prevMap = Object.fromEntries(prev.map(i => [i.id, i]));
-          return processed.map(newItem => {
-            const old = prevMap[newItem.id];
-            if (!old) return newItem;
-            if (
-              old.status           !== newItem.status ||
-              old.superAdminLocked !== newItem.superAdminLocked
-            ) return newItem;
-            return old;
-          });
+      setItems(prev => {
+        if (!silent) return processed;
+        const prevMap = Object.fromEntries(prev.map(i => [i.id, i]));
+        return processed.map(newItem => {
+          const old = prevMap[newItem.id];
+          if (!old) return newItem;
+          if (
+            old.status           !== newItem.status ||
+            old.superAdminLocked !== newItem.superAdminLocked
+          ) return newItem;
+          return old;
         });
-      }
+      });
 
       if (!silent) {
         setShowForm(processed.length === 0);
         websitesFetched.current = true;
+        // ── Run plan enforcement after first fetch ──
+        enforcePlanLimit(processed, ud.maxBot);
       }
-
-      // Plan limit check — handles both modal open/close
-      checkAndEnforcePlanLimit(processed, ud.maxBot);
-
     } catch (err) {
       if (!silent) setError(err.message || 'Failed to fetch data');
     }
-  }, [isTokenValidated, checkAndEnforcePlanLimit]);
+  }, [isTokenValidated, enforcePlanLimit]);
 
-  // ── FIRST FETCH ──
   useEffect(() => {
     if (userData && authToken && isTokenValidated && !websitesFetched.current) {
       fetchUserItems(false);
     }
   }, [userData, authToken, isTokenValidated, fetchUserItems]);
 
-  // ── COMBINED POLLING - Calls both APIs every 8 seconds ──
   useEffect(() => {
     if (!userData || !authToken || !isTokenValidated) return;
-    if (pollStarted.current) return; // Already started
-    pollStarted.current = true;
-
     pollRef.current = setInterval(() => {
-      fetchUserItems(true);      // Fetch websites
-      fetchMaxBotLimit();        // Fetch max-bot limit
+      fetchUserItems(true);
     }, POLL_INTERVAL);
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      pollStarted.current = false;
-    };
-  }, [isTokenValidated]); // Only depends on isTokenValidated
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [userData, authToken, isTokenValidated, fetchUserItems]);
 
   // ─────────────────────────────────────────────────────────────
-  // MODAL CONFIRM
+  // MODAL CONFIRM — user picks which bots to keep active
+  // Bots NOT in selectedIds → set planDisabled=true, status=inactive
   // ─────────────────────────────────────────────────────────────
   const handlePlanModalConfirm = useCallback(async (selectedIds) => {
+    setShowPlanModal(false);
     const token = authTokenRef.current;
     const ud    = userDataRef.current;
     if (!token || !ud) return;
 
+    // Bots that need to be disabled (were active, not selected)
     const toDisable = planModalBots.filter(
       b => b.status === 'active' && !selectedIds.includes(b.id)
     );
 
-    // Step 1: Close modal
-    setShowPlanModal(false);
+    // Optimistically update UI
+    setItems(prev => prev.map(item => {
+      if (toDisable.some(d => d.id === item.id)) {
+        return { ...item, status: 'inactive', planDisabled: true };
+      }
+      return item;
+    }));
 
-    // Step 2: Optimistic UI update
-    setItems(prev => prev.map(item =>
-      toDisable.some(d => d.id === item.id)
-        ? { ...item, status: 'inactive', planDisabled: true }
-        : item
-    ));
+    // Fire PATCH requests for each bot to disable
+    await Promise.all(
+      toDisable.map(bot =>
+        fetch(`${API_URL}/${bot.id}/status/role-aware`, {
+          method:  'PATCH',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            status:      'inactive',
+            changedBy:   'admin',
+            planDisabled: true,         // backend can store this flag
+          }),
+        }).catch(() => null)
+      )
+    );
 
-    if (toDisable.length === 0) {
-      setShowSuccessMessage('✅ Plan limit is now within range.');
-      setTimeout(() => setShowSuccessMessage(''), 2000);
-      return;
-    }
-
-    // Step 3: Backend API call
-    try {
-      await Promise.all(
-        toDisable.map(bot =>
-          fetch(`${API_URL}/${bot.id}/status/role-aware`, {
-            method:  'PATCH',
-            headers: {
-              'Content-Type':  'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              status:       'inactive',
-              changedBy:    'admin',
-              planDisabled: true,
-            }),
-          }).catch(() => null)
-        )
-      );
-
-      setShowSuccessMessage(
-        `✅ ${toDisable.length} bot${toDisable.length > 1 ? 's' : ''} disabled to match your plan limit.`
-      );
-      setTimeout(() => setShowSuccessMessage(''), 3000);
-
-      // Step 4: Fresh data
-      await fetchUserItems(false);
-
-    } catch {
-      setError('Some bots could not be disabled. Please refresh.');
-    }
-  }, [planModalBots, fetchUserItems]);
+    setShowSuccessMessage(`✅ ${toDisable.length} bot${toDisable.length > 1 ? 's' : ''} disabled to match your plan limit.`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  }, [planModalBots]);
 
   // ── FORM ──
   const resetForm = () => {
@@ -484,31 +553,42 @@ const AdminPanel = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!authToken || !userData || !isTokenValidated) { window.location.replace('/login'); return; }
-    setSaving(true); setError(null);
+
+    setSaving(true);
+    setError(null);
 
     if (!editingId && items.length >= userData.maxBot) {
       setError(`You've reached your limit of ${userData.maxBot} websites.`);
-      setSaving(false); return;
+      setSaving(false);
+      return;
     }
 
     const payload = {
-      websiteName: configData.websiteName, websiteUrl: configData.websiteUrl,
-      category: configData.category, systemPrompt: configData.systemPrompt,
-      customPrompt: configData.customPrompt, role: configData.roles,
-      aifuture: configData.aifuture, status: configData.status, userId: userData.userId
+      websiteName:  configData.websiteName,
+      websiteUrl:   configData.websiteUrl,
+      category:     configData.category,
+      systemPrompt: configData.systemPrompt,
+      customPrompt: configData.customPrompt,
+      role:         configData.roles,
+      aifuture:     configData.aifuture,
+      status:       configData.status,
+      userId:       userData.userId
     };
 
     try {
       const url    = editingId ? `${API_URL}/user/${userData.userId}/websites/${editingId}` : API_URL;
       const method = editingId ? 'PUT' : 'POST';
-      const res    = await fetch(url, {
+
+      const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify(payload),
       });
 
       if (res.status === 401 || res.status === 403) {
-        sessionStorage.removeItem('adminAuthToken'); window.location.replace('/login'); return;
+        sessionStorage.removeItem('adminAuthToken');
+        window.location.replace('/login');
+        return;
       }
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -519,22 +599,29 @@ const AdminPanel = () => {
       setTimeout(() => setShowSuccessMessage(''), 3000);
       websitesFetched.current = false;
       await fetchUserItems(false);
-      resetForm(); setShowForm(false);
+      resetForm();
+      setShowForm(false);
     } catch (err) {
       setError(err.message || 'Error saving data');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // ── STATUS CHANGE ──
+  // ── STATUS CHANGE (with plan-limit guard) ──
   const handleStatusChange = async (id, newStatus) => {
     if (!authToken || !userData || !isTokenValidated) { window.location.replace('/login'); return; }
 
+    // ── PLAN LIMIT GUARD ──
+    // If trying to activate and already at limit → block
     if (newStatus === 'active') {
-      const currentActive = items.filter(b => b.status === 'active' && b.id !== id).length;
+      const currentActive = items.filter(
+        b => b.status === 'active' && b.id !== id
+      ).length;
       if (currentActive >= userData.maxBot) {
         setError(
           `⚠️ Plan limit reached (${userData.maxBot} active bot${userData.maxBot > 1 ? 's' : ''}). ` +
-          `Deactivate another bot first.`
+          `Deactivate another bot first to activate this one.`
         );
         return;
       }
@@ -543,7 +630,10 @@ const AdminPanel = () => {
     try {
       const res = await fetch(`${API_URL}/${id}/status/role-aware`, {
         method:  'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
         body: JSON.stringify({ status: newStatus, changedBy: 'admin' }),
       });
 
@@ -553,24 +643,32 @@ const AdminPanel = () => {
         setError('🔒 Locked by SuperAdmin. Only SuperAdmin can reactivate this website.');
         return;
       }
+
       if (res.status === 401 || res.status === 403) {
-        sessionStorage.removeItem('adminAuthToken'); window.location.replace('/login'); return;
+        sessionStorage.removeItem('adminAuthToken');
+        window.location.replace('/login');
+        return;
       }
+
       if (!res.ok) throw new Error(data.error || 'Failed to update status');
 
       setItems(prev => prev.map(item =>
         item.id === id
           ? {
               ...item,
-              status:           newStatus,
+              status:          newStatus,
               superAdminLocked: data.item?.superAdminLocked || false,
-              planDisabled:     newStatus === 'active' ? false : item.planDisabled,
+              // Clear planDisabled if being activated (user freed up a slot)
+              planDisabled:    newStatus === 'active' ? false : item.planDisabled,
             }
           : item
       ));
+
       setShowSuccessMessage(`✅ Status updated to ${newStatus}`);
       setTimeout(() => setShowSuccessMessage(''), 2000);
-    } catch (err) { setError(err.message || 'Error updating status'); }
+    } catch (err) {
+      setError(err.message || 'Error updating status');
+    }
   };
 
   // ── EDIT ──
@@ -579,31 +677,44 @@ const AdminPanel = () => {
     const item = items.find(i => i.id === id);
     if (item) {
       setConfigData({
-        websiteName: item.websiteName, websiteUrl: item.websiteUrl,
-        category: item.category || [], systemPrompt: item.systemPrompt || [],
-        customPrompt: item.customPrompt || [], roles: item.roles || [],
-        aifuture: item.aifuture || [], status: item.status || 'active', apiKey: item.apiKey
+        websiteName:  item.websiteName,
+        websiteUrl:   item.websiteUrl,
+        category:     item.category     || [],
+        systemPrompt: item.systemPrompt || [],
+        customPrompt: item.customPrompt || [],
+        roles:        item.roles        || [],
+        aifuture:     item.aifuture     || [],
+        status:       item.status       || 'active',
+        apiKey:       item.apiKey
       });
-      setEditingId(id); setShowForm(true);
+      setEditingId(id);
+      setShowForm(true);
     }
   };
 
-  // ── DELETE ──
+  // ── DELETE (SOFT DELETE) ──
   const handleDelete = async (id) => {
     if (!authToken || !userData || !isTokenValidated) { window.location.replace('/login'); return; }
     try {
       const res = await fetch(`${API_URL}/user/${userData.userId}/websites/${id}/soft`, {
-        method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` }
+        method:  'DELETE',
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (res.status === 401 || res.status === 403) {
-        sessionStorage.removeItem('adminAuthToken'); window.location.replace('/login'); return;
+        sessionStorage.removeItem('adminAuthToken');
+        window.location.replace('/login');
+        return;
       }
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+
       setShowSuccessMessage('✅ Website removed!');
       setTimeout(() => setShowSuccessMessage(''), 2000);
+
       setItems(prev => prev.filter(item => item.id !== id));
       if (items.length <= 1) setShowForm(true);
-    } catch (err) { setError(err.message || 'Delete error'); }
+    } catch (err) {
+      setError(err.message || 'Delete error');
+    }
   };
 
   // ── LOGOUT ──
@@ -612,14 +723,16 @@ const AdminPanel = () => {
   const performLogout = async () => {
     if (pollRef.current) clearInterval(pollRef.current);
     if (expiryCheckInterval.current) clearInterval(expiryCheckInterval.current);
-    sessionStorage.removeItem('adminAuthToken'); sessionStorage.clear();
+    sessionStorage.removeItem('adminAuthToken');
+    sessionStorage.clear();
     localStorage.removeItem('adminAuthToken');
     setUserData(null); setAuthToken(null); setItems([]); setIsTokenValidated(false);
-    tokenCheckedRef.current = false; websitesFetched.current = false; pollStarted.current = false;
+    tokenCheckedRef.current = false; websitesFetched.current = false;
     await signOut({ callbackUrl: '/login', redirect: true });
     window.location.replace('/login');
   };
 
+  // ── LOADING ──
   if (loading) {
     return (
       <div className={styles.adminContainer}>
@@ -649,14 +762,14 @@ const AdminPanel = () => {
     );
   }
 
-  const activeCount = items.filter(i => i.status === 'active').length;
-
+  // ── MAIN RENDER ──
   return (
     <div className={styles.adminContainer}>
 
+      {/* ── PLAN LIMIT MODAL ── */}
       {showPlanModal && (
         <PlanLimitModal
-          bots={planModalBots}
+          bots={planModalBots.filter(b => b.status === 'active')}
           maxBot={userData.maxBot}
           onConfirm={handlePlanModalConfirm}
         />
@@ -712,6 +825,7 @@ const AdminPanel = () => {
             </h1>
             <p className={styles.headerSubtitle}>Manage your AI-powered websites</p>
           </div>
+
           <div className={styles.headerRight}>
             <div className={styles.userProfile}>
               <div className={styles.profileIcon}><span className={styles.icon}>👤</span></div>
@@ -720,29 +834,29 @@ const AdminPanel = () => {
                   <span className={`${styles.statusBadge} ${userData.plan ? styles.active : styles.inactive}`}>
                     {userData.planName ? `✨ ${userData.planName}` : '🔹 Free Plan'}
                   </span>
-                  <span className={`${styles.websiteCount} ${activeCount > userData.maxBot ? styles.warning : ''}`}>
-                    {activeCount}/{userData.maxBot}
-                  </span>
+                  <span className={styles.websiteCount}>{items.length}/{userData.maxBot}</span>
                 </div>
                 <div className={styles.usageBar}>
                   <div
                     className={styles.usageFill}
-                    style={{ width: `${Math.min((activeCount / userData.maxBot) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((items.length / userData.maxBot) * 100, 100)}%` }}
                   >
                     <span className={styles.usagePercentage}>
-                      {Math.round(Math.min((activeCount / userData.maxBot) * 100, 100))}%
+                      {Math.round((items.length / userData.maxBot) * 100)}%
                     </span>
                   </div>
                   <span className={styles.usageText}>
-                    {activeCount} of {userData.maxBot} websites active
+                    {items.length} of {userData.maxBot} websites used
                   </span>
                 </div>
               </div>
             </div>
+
             <button onClick={() => router.push('/dashboard')} className={styles.dashboardButton}>
               <span className={styles.dashboardIcon}>📊</span>
               <span className={styles.dashboardText}>Dashboard</span>
             </button>
+
             <button onClick={confirmLogout} className={styles.logoutButton}>
               <span className={styles.logoutIcon}>↪</span>
               <span className={styles.logoutText}>Logout</span>
@@ -767,10 +881,7 @@ const AdminPanel = () => {
                 <div className={styles.upgradePrompt}>
                   <span className={styles.upgradeIcon}>✨</span>
                   <span className={styles.upgradeText}>
-                    Max limit reached.{' '}
-                    <button onClick={() => router.push('/pricing')} className={styles.upgradeLink}>
-                      Upgrade plan
-                    </button>
+                    Max limit reached. <button onClick={() => router.push('/pricing')} className={styles.upgradeLink}>Upgrade plan</button>
                   </span>
                 </div>
               )}
@@ -779,9 +890,7 @@ const AdminPanel = () => {
             {items.length > 0 && (
               <div className={styles.statsBox}>
                 <div className={styles.statItem}>
-                  <span className={`${styles.statNumber} ${activeCount > userData.maxBot ? styles.warningText : ''}`}>
-                    {activeCount}
-                  </span>
+                  <span className={styles.statNumber}>{items.filter(i => i.status === 'active').length}</span>
                   <span className={styles.statLabel}>Active</span>
                 </div>
                 <div className={styles.statDivider}>|</div>
@@ -791,8 +900,8 @@ const AdminPanel = () => {
                 </div>
                 <div className={styles.statDivider}>|</div>
                 <div className={styles.statItem}>
-                  <span className={styles.statNumber}>{items.length}</span>
-                  <span className={styles.statLabel}>Total</span>
+                  <span className={styles.statNumber}>{userData.maxBot - items.filter(i => i.status === 'active').length}</span>
+                  <span className={styles.statLabel}>Slots Left</span>
                 </div>
               </div>
             )}
@@ -801,21 +910,35 @@ const AdminPanel = () => {
 
         {showForm ? (
           <WebsiteConfig
-            config={configData} setConfig={setConfigData}
-            tempSystemPrompt={tempSystemPrompt} setTempSystemPrompt={setTempSystemPrompt}
-            tempCustomPrompt={tempCustomPrompt} setTempCustomPrompt={setTempCustomPrompt}
-            tempCategory={tempCategory} setTempCategory={setTempCategory}
-            tempRole={tempRole} setTempRole={setTempRole}
-            tempRoleValue={tempRoleValue} setTempRoleValue={setTempRoleValue}
-            onSubmit={handleSubmit} onCancel={handleShowList}
-            hasItems={items.length > 0} websiteId={editingId}
-            apiKey={configData.apiKey} backendApiKey={configData.apiKey}
-            userData={userData} saving={saving}
+            config={configData}
+            setConfig={setConfigData}
+            tempSystemPrompt={tempSystemPrompt}
+            setTempSystemPrompt={setTempSystemPrompt}
+            tempCustomPrompt={tempCustomPrompt}
+            setTempCustomPrompt={setTempCustomPrompt}
+            tempCategory={tempCategory}
+            setTempCategory={setTempCategory}
+            tempRole={tempRole}
+            setTempRole={setTempRole}
+            tempRoleValue={tempRoleValue}
+            setTempRoleValue={setTempRoleValue}
+            onSubmit={handleSubmit}
+            onCancel={handleShowList}
+            hasItems={items.length > 0}
+            websiteId={editingId}
+            apiKey={configData.apiKey}
+            backendApiKey={configData.apiKey}
+            userData={userData}
+            saving={saving}
           />
         ) : items.length > 0 ? (
           <WebsiteList
-            websites={items} onEdit={handleEdit} onDelete={handleDelete}
-            onAddNew={handleAddNew} onStatusChange={handleStatusChange} userData={userData}
+            websites={items}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onAddNew={handleAddNew}
+            onStatusChange={handleStatusChange}
+            userData={userData}
           />
         ) : (
           <div className={styles.emptyState}>
@@ -827,7 +950,7 @@ const AdminPanel = () => {
               <span className={styles.planReminderText}>
                 Plan: <strong>{userData.planName || 'Free'}</strong> |
                 Limit: <strong>{userData.maxBot}</strong> |
-                Active: <strong>{activeCount}/{userData.maxBot}</strong>
+                Used: <strong>{items.length}/{userData.maxBot}</strong>
               </span>
             </div>
             <button className={styles.emptyStateButton} onClick={handleAddNew}>

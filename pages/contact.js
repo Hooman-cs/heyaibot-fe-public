@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Navbar from '../app/Navbar'; // Import added
 import Footer from '../app/Footer';
+import Head from "next/head";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -49,6 +50,11 @@ export default function ContactPage() {
 
   return (
     <>
+      <Head>
+        <title>Contact Us - Hey AI Bot</title>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="canonical" href="https://www.heyaibot.com/contact" />
+      </Head>
       <Navbar />
       <div className="bg-gray-50 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden">

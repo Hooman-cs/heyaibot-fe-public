@@ -8,7 +8,7 @@ import config        from '../app/components/utils/config';
 import { signOut }   from 'next-auth/react';
 
 const API_URL = `${config.apiBaseUrl}/api/websites`;
-const POLL_INTERVAL = 5000; // 5 seconds
+const POLL_INTERVAL = 5000;
 
 const SuperAdminPanel = () => {
   const router = useRouter();
@@ -24,9 +24,9 @@ const SuperAdminPanel = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm]   = useState(false);
 
-  const pollRef        = useRef(null);
-  const itemsRef       = useRef(items); // latest items ka ref — polling mein stale closure se bachao
-  itemsRef.current     = items;
+  const pollRef    = useRef(null);
+  const itemsRef   = useRef(items);
+  itemsRef.current = items;
 
   const userData = { planName: 'Super Admin', plan: true, maxBot: Infinity };
 
@@ -89,11 +89,12 @@ const SuperAdminPanel = () => {
     return () => window.removeEventListener('popstate', blockBack);
   }, []);
 
-  // ── FETCH — silent (no loading spinner, sirf items update) ──
+  // ── FETCH — ?superadmin=true so adminDeleted items bhi aayein ──
   const fetchItems = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch(API_URL, {
+      // superadmin=true → adminDeleted websites bhi dikhenge
+      const res = await fetch(`${API_URL}?superadmin=true`, {
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store'
       });
@@ -106,16 +107,15 @@ const SuperAdminPanel = () => {
         aifuture: item.aifuture || []
       }));
 
-      // ── Smart merge — sirf changed items update karo ──
       setItems(prev => {
         const prevMap = Object.fromEntries(prev.map(i => [i.id, i]));
         return processed.map(newItem => {
           const old = prevMap[newItem.id];
           if (!old) return newItem;
-          // Agar status ya lock changed hai to update karo, warna old raho
           if (
-            old.status            !== newItem.status ||
-            old.superAdminLocked  !== newItem.superAdminLocked
+            old.status           !== newItem.status ||
+            old.superAdminLocked !== newItem.superAdminLocked ||
+            old.adminDeleted     !== newItem.adminDeleted
           ) return newItem;
           return old;
         });
@@ -129,22 +129,16 @@ const SuperAdminPanel = () => {
     }
   }, []);
 
-  // Initial fetch
   useEffect(() => {
     if (verified) fetchItems(false);
   }, [verified, fetchItems]);
 
-  // ── POLLING — har 5 second mein silent fetch ──
   useEffect(() => {
     if (!verified) return;
-
     pollRef.current = setInterval(() => {
-      fetchItems(true); // silent = true → no loading spinner
+      fetchItems(true);
     }, POLL_INTERVAL);
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [verified, fetchItems]);
 
   // ── FORM ──
@@ -191,7 +185,7 @@ const SuperAdminPanel = () => {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to save: ${res.status}`);
+        throw new Error(errorData.error || `Failed: ${res.status}`);
       }
 
       setShowSuccessMessage(editingId ? '✅ Website updated!' : '✅ Website created!');
@@ -206,7 +200,7 @@ const SuperAdminPanel = () => {
     }
   };
 
-  // ── STATUS CHANGE — SUPERADMIN ──
+  // ── STATUS CHANGE ──
   const handleStatusChange = async (id, newStatus) => {
     try {
       const res = await fetch(`${API_URL}/${id}/status/role-aware`, {
@@ -218,7 +212,6 @@ const SuperAdminPanel = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update status');
 
-      // ✅ Optimistic update — UI turant update ho jaye, polling ka wait nahi
       setItems(prev => prev.map(i =>
         i.id === id
           ? { ...i, status: newStatus, superAdminLocked: data.superAdminLocked || false }
@@ -253,7 +246,7 @@ const SuperAdminPanel = () => {
     }
   };
 
-  // ── DELETE ──
+  // ── PERMANENT DELETE (SuperAdmin only) ──
   const handleDelete = async (id) => {
     try {
       const res = await fetch(`${API_URL}/${id}`, {
@@ -262,12 +255,37 @@ const SuperAdminPanel = () => {
       });
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 
-      setShowSuccessMessage('✅ Website deleted!');
+      setShowSuccessMessage('✅ Website permanently deleted!');
       setTimeout(() => setShowSuccessMessage(''), 2000);
       setItems(prev => prev.filter(item => item.id !== id));
       if (items.length <= 1) setShowForm(true);
     } catch (err) {
       setError(err.message || 'Delete error');
+    }
+  };
+
+  // ── RESTORE (Admin ne delete kiya tha, SuperAdmin wapas la sakta hai) ──
+  const handleRestore = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/${id}/restore`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Restore failed');
+
+      // Optimistic update
+      setItems(prev => prev.map(item =>
+        item.id === id
+          ? { ...item, adminDeleted: false, adminDeletedAt: null }
+          : item
+      ));
+
+      setShowSuccessMessage('✅ Website restored! Admin can see it again.');
+      setTimeout(() => setShowSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Restore error');
     }
   };
 
@@ -309,6 +327,10 @@ const SuperAdminPanel = () => {
       </div>
     );
   }
+
+  // Stats — adminDeleted wale alag count karo
+  const adminDeletedCount = items.filter(i => i.adminDeleted === true).length;
+  const visibleItems      = items.filter(i => i.adminDeleted !== true);
 
   // ── MAIN RENDER ──
   return (
@@ -398,12 +420,12 @@ const SuperAdminPanel = () => {
             {items.length > 0 && (
               <div className={styles.statsBox}>
                 <div className={styles.statItem}>
-                  <span className={styles.statNumber}>{items.filter(i => i.status === 'active').length}</span>
+                  <span className={styles.statNumber}>{items.filter(i => i.status === 'active' && !i.adminDeleted).length}</span>
                   <span className={styles.statLabel}>Active</span>
                 </div>
                 <div className={styles.statDivider}>|</div>
                 <div className={styles.statItem}>
-                  <span className={styles.statNumber}>{items.filter(i => i.status === 'inactive').length}</span>
+                  <span className={styles.statNumber}>{items.filter(i => i.status === 'inactive' && !i.adminDeleted).length}</span>
                   <span className={styles.statLabel}>Inactive</span>
                 </div>
                 <div className={styles.statDivider}>|</div>
@@ -411,6 +433,15 @@ const SuperAdminPanel = () => {
                   <span className={styles.statNumber}>{items.length}</span>
                   <span className={styles.statLabel}>Total</span>
                 </div>
+                {adminDeletedCount > 0 && (
+                  <>
+                    <div className={styles.statDivider}>|</div>
+                    <div className={styles.statItem}>
+                      <span className={styles.statNumber} style={{ color: '#f59e0b' }}>{adminDeletedCount}</span>
+                      <span className={styles.statLabel}>Admin Deleted</span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -445,6 +476,7 @@ const SuperAdminPanel = () => {
             onDelete={handleDelete}
             onAddNew={handleAddNew}
             onStatusChange={handleStatusChange}
+            onRestore={handleRestore}
           />
         ) : (
           <div className={styles.emptyState}>

@@ -5,18 +5,14 @@ import styles from './AuthorList.module.css';
 import { FaTrash, FaEdit, FaGlobe, FaKey, FaCode, FaLock } from 'react-icons/fa';
 import { IoMdSwitch } from 'react-icons/io';
 import CodePopup from '../Code/CodePopup';
-import config from '../utils/config';
 
-const API_URL = `${config.apiBaseUrl}/api/websites`;
-
-const AdminWebsiteList = ({ websites, onEdit, onDelete, onAddNew, onStatusChange, userData }) => {
+const AdminWebsiteList = ({ websites, onEdit, onDelete, onAddNew, onStatusChange }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [showCodePopup, setShowCodePopup] = useState(false);
   const [selectedWebsite, setSelectedWebsite] = useState(null);
   const [loadingStatusId, setLoadingStatusId] = useState(null);
   const [lockedWarningId, setLockedWarningId] = useState(null);
-  const [savingCode, setSavingCode] = useState(false);
   const [updatedWebsites, setUpdatedWebsites] = useState(websites);
   const [formData, setFormData] = useState({
     superAdminUrl: '',
@@ -46,11 +42,11 @@ const AdminWebsiteList = ({ websites, onEdit, onDelete, onAddNew, onStatusChange
   // ── CODE POPUP ──
   const handleCodeButtonClick = (website) => {
     setSelectedWebsite(website);
-    // Load existing data from website object
+    const existingData = updatedWebsites.find(w => w.id === website.id);
     setFormData({
-      superAdminUrl: website.superAdminUrl || '',
-      superAdminChatUrl: website.superAdminChatUrl || '',
-      code: website.code || ''
+      superAdminUrl: existingData?.superAdminUrl || '',
+      superAdminChatUrl: existingData?.superAdminChatUrl || '',
+      code: existingData?.code || ''
     });
     setShowCodePopup(true);
   };
@@ -59,72 +55,18 @@ const AdminWebsiteList = ({ websites, onEdit, onDelete, onAddNew, onStatusChange
     setShowCodePopup(false);
     setSelectedWebsite(null);
     setFormData({ superAdminUrl: '', superAdminChatUrl: '', code: '' });
-    setSavingCode(false);
   };
 
   const handleFormChange = (name, value) =>
     setFormData(prev => ({ ...prev, [name]: value }));
 
-  // ── SAVE CODE TO BACKEND ──
-  const handleSaveCode = async () => {
-    if (!selectedWebsite || !userData) return;
-    
-    setSavingCode(true);
-    
-    try {
-      // Prepare payload with custom data
-      const payload = {
-        customData: {
-          superAdminUrl: formData.superAdminUrl,
-          superAdminChatUrl: formData.superAdminChatUrl,
-          code: formData.code
-        }
-      };
-      
-      // API call to update custom data
-      const response = await fetch(`${API_URL}/${selectedWebsite.id}/custom-data`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userData.token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to save: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        // Update local state
-        const updatedWebsite = {
-          ...selectedWebsite,
-          superAdminUrl: formData.superAdminUrl,
-          superAdminChatUrl: formData.superAdminChatUrl,
-          code: formData.code
-        };
-        
-        setUpdatedWebsites(prev =>
-          prev.map(w => w.id === selectedWebsite.id ? updatedWebsite : w)
-        );
-        
-        // Notify parent component about the update
-        if (onEdit) {
-          onEdit(selectedWebsite.id, updatedWebsite);
-        }
-        
-        handleCloseCodePopup();
-      } else {
-        throw new Error(result.error || 'Failed to save configuration');
-      }
-    } catch (error) {
-      console.error('Error saving code configuration:', error);
-      // You might want to show an error message to the user
-      alert('Failed to save configuration. Please try again.');
-    } finally {
-      setSavingCode(false);
+  const handleSaveCode = () => {
+    if (selectedWebsite) {
+      setUpdatedWebsites(prev =>
+        prev.map(w => w.id === selectedWebsite.id ? { ...w, ...formData } : w)
+      );
+      onEdit(selectedWebsite.id, formData);
+      handleCloseCodePopup();
     }
   };
 
@@ -252,7 +194,7 @@ const AdminWebsiteList = ({ websites, onEdit, onDelete, onAddNew, onStatusChange
                       rel="noopener noreferrer"
                       className={styles.urlLink}
                     >
-                      {website.websiteUrl?.replace(/^https?:\/\//, '')}
+                      {website.websiteUrl.replace(/^https?:\/\//, '')}
                     </a>
                   </div>
 
@@ -406,7 +348,6 @@ const AdminWebsiteList = ({ websites, onEdit, onDelete, onAddNew, onStatusChange
           onSave={handleSaveCode}
           formData={formData}
           onFormChange={handleFormChange}
-          saving={savingCode}
         />
       )}
 

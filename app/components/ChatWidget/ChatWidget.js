@@ -140,21 +140,7 @@ const ChatWidget = ({
     fetchBrandingData();
   }, [apiBaseUrl, backendApiKey]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // ✅ DEFINITIVE RELOAD DETECTION
-  //
-  // Strategy: ONE reliable flag — 'chat_user_messaged'
-  //   - Set to 'true' ONLY inside saveSingleMessage after a user message
-  //     is successfully saved to the DB (not from React state)
-  //   - On every page load: if sessionId exists AND this flag is 'true' → RELOAD
-  //   - After detecting reload: set force_new_thread flag, clear chat_user_messaged
-  //     so next first message in new session won't falsely trigger reload again
-  //
-  // This is reliable because:
-  //   - React state resets on reload (unreliable)
-  //   - performance.getEntriesByType unreliable in Next.js (unreliable)
-  //   - localStorage persists across reloads (reliable ✅)
-  //   - Flag is set from DB save callback not React render (reliable ✅)
+
   // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -182,13 +168,11 @@ const ChatWidget = ({
       localStorage.setItem('force_new_thread', 'true');
       threadResetRef.current = true;
 
-      // ✅ Clear the messaged flag — so NEXT session doesn't falsely detect reload
-      // Will be re-set when user sends first message in this new session
+
       localStorage.removeItem('chat_user_messaged');
 
     
 
-      // Reset UI state
       setMessages([]);
       setCurrentPromptFlow(null);
       setCollectedData({});
@@ -373,13 +357,7 @@ const ChatWidget = ({
     finally { setIsSaving(false); }
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // ✅ FIXED saveSingleMessage
-  //    1. No activeConfig check — saves even before config loads
-  //    2. Sets 'chat_user_messaged' after first successful user msg save
-  //       → this is what enables reliable reload detection next time
-  //    3. localStorage PRIMARY for force_new_thread, ref BACKUP
-  // ─────────────────────────────────────────────────────────────────
+
   const saveSingleMessage = async (role, text, tokens = 0) => {
     if (!sessionId) return;
     if (text === 'Saving your request...') return;

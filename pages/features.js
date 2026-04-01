@@ -1,4 +1,5 @@
 import React from 'react';
+import Head from "next/head";
 import Navbar from '../app/Navbar';
 import Footer from '../app/Footer';
 import Link from 'next/link';
@@ -31,128 +32,141 @@ export default function Features() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen font-sans bg-slate-50">
-      <Navbar />
-      
-      <main className="flex-grow">
-        {/* Hero Section */}
-        <section className="relative py-24 bg-gradient-to-b from-slate-900 to-indigo-950 text-white overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-10"></div>
-          <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10 text-center">
-            <h2 className="text-indigo-400 font-bold tracking-widest uppercase mb-4">AI Chatbot for Website</h2>
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6">Powerful Features to <br className="hidden md:block" /> Grow Your Business</h1>
-            <p className="text-xl text-slate-300 max-w-3xl mx-auto font-light leading-relaxed">
-              In the current competitive digital environment, businesses require immediate engagement, automated lead generation, and round-the-clock customer service. This intelligent automation tool converts website visitors into qualified leads and enhances customer satisfaction.
-            </p>
-          </div>
-        </section>
+    <>
+      <Head>
+        <title>Website AI Chatbot Solutions | Smart Automation</title>
+        <meta name="title" content="Website AI Chatbot Solutions | Smart Automation" />
+        <meta
+          name="description"
+          content="Explore AI chatbot products for websites that automate customer support, capture leads, and increase conversions with smart AI technology."
+        />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        {/* ADD CANONICAL TAG */}
+        <link rel="canonical" href="https://www.heyaibot.com/features" />
+      </Head>
 
-        {/* Core Features Grid */}
-        <section className="py-24 bg-white">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl mb-4">Core Features of Our AI Chatbot</h2>
+      <div className="flex flex-col min-h-screen font-sans bg-slate-50">
+        <Navbar />
+
+        <main className="flex-grow">
+          {/* Hero Section */}
+          <section className="relative py-24 bg-gradient-to-b from-slate-900 to-indigo-950 text-white overflow-hidden">
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-10"></div>
+            <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10 text-center">
+              <h2 className="text-indigo-400 font-bold tracking-widest uppercase mb-4">AI Chatbot for Website</h2>
+              <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6">Powerful Features to <br className="hidden md:block" /> Grow Your Business</h1>
+              <p className="text-xl text-slate-300 max-w-3xl mx-auto font-light leading-relaxed">
+                In the current competitive digital environment, businesses require immediate engagement, automated lead generation, and round-the-clock customer service. This intelligent automation tool converts website visitors into qualified leads and enhances customer satisfaction.
+              </p>
             </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {features.map((feature, idx) => (
-                <div key={idx} className={`p-8 rounded-3xl border ${feature.border} ${feature.bg} bg-opacity-40 hover:bg-opacity-100 transition-all duration-300 shadow-sm hover:shadow-lg flex flex-col`}>
-                  <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-6">
-                    {feature.icon}
+          </section>
+
+          {/* Core Features Grid */}
+          <section className="py-24 bg-white">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <div className="text-center mb-16">
+                <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl mb-4">Core Features of Our AI Chatbot</h2>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {features.map((feature, idx) => (
+                  <div key={idx} className={`p-8 rounded-3xl border ${feature.border} ${feature.bg} bg-opacity-40 hover:bg-opacity-100 transition-all duration-300 shadow-sm hover:shadow-lg flex flex-col`}>
+                    <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-6">
+                      {feature.icon}
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h3>
+                    <p className="text-slate-600 text-sm font-medium mb-6 pb-6 border-b border-slate-200/60 flex-1">
+                      {feature.desc}
+                    </p>
+                    <ul className="space-y-3">
+                      {feature.points.map((point, i) => (
+                        <li key={i} className="flex items-start text-sm text-slate-700 font-medium">
+                          <MiniCheck /> {point}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h3>
-                  <p className="text-slate-600 text-sm font-medium mb-6 pb-6 border-b border-slate-200/60 flex-1">
-                    {feature.desc}
-                  </p>
-                  <ul className="space-y-3">
-                    {feature.points.map((point, i) => (
-                      <li key={i} className="flex items-start text-sm text-slate-700 font-medium">
-                        <MiniCheck /> {point}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Comparison Table */}
-        <section className="py-24 bg-slate-50 border-t border-slate-200">
-          <div className="max-w-6xl mx-auto px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl mb-4">Comparison: AI Chatbot vs Human Support</h2>
-              <p className="text-lg text-slate-600 max-w-2xl mx-auto">Choosing between an AI Chatbot and Human Support is critical for business growth. Below is a detailed comparison to help you decide.</p>
-            </div>
-            
-            <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+          {/* Comparison Table */}
+          <section className="py-24 bg-slate-50 border-t border-slate-200">
+            <div className="max-w-6xl mx-auto px-6 lg:px-8">
+              <div className="text-center mb-16">
+                <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl mb-4">Comparison: AI Chatbot vs Human Support</h2>
+                <p className="text-lg text-slate-600 max-w-2xl mx-auto">Choosing between an AI Chatbot and Human Support is critical for business growth. Below is a detailed comparison to help you decide.</p>
+              </div>
+
+              <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse min-w-[800px]">
-                      <thead>
-                          <tr className="bg-slate-900 text-white">
-                              <th className="px-8 py-6 text-sm font-bold uppercase tracking-wider w-1/4">Feature</th>
-                              <th className="px-8 py-6 text-sm font-bold uppercase tracking-wider bg-indigo-600 w-2/5">AI Chatbot for Website</th>
-                              <th className="px-8 py-6 text-sm font-bold uppercase tracking-wider bg-slate-800 text-slate-300 w-2/5">Human Support Team</th>
-                          </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">24/7 Availability</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Operates 24/7 without breaks or holidays</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Limited to office hours</td>
-                          </tr>
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">Response Time</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Instant replies within seconds</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> May delay during peak hours</td>
-                          </tr>
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">Cost Efficiency</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Fixed cost, no salary or HR expense</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Salaries, training & overhead costs</td>
-                          </tr>
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">Lead Automation</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Automatic data capture & CRM sync</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Manual lead collection</td>
-                          </tr>
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">Scalability</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Easily scalable during high traffic</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Requires hiring more staff</td>
-                          </tr>
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">Handles Multiple Users</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Unlimited simultaneous conversations</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Limited per agent</td>
-                          </tr>
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">Accuracy & Consistency</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Structured, consistent answers</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Human error possible</td>
-                          </tr>
-                          <tr className="hover:bg-slate-50 transition-colors">
-                              <td className="px-8 py-5 text-sm font-bold text-slate-900">Emotional Intelligence</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableWarn /> Handles structured queries well</td>
-                              <td className="px-8 py-5 text-sm text-slate-500"><TableCheck /> Strong emotional understanding</td>
-                          </tr>
-                          <tr className="bg-indigo-50/50">
-                              <td className="px-8 py-5 text-sm font-bold text-indigo-900">Best For</td>
-                              <td className="px-8 py-5 text-sm font-bold text-indigo-700">Lead generation, automation, FAQs, and bookings</td>
-                              <td className="px-8 py-5 text-sm font-medium text-slate-600">Complex, sensitive conversations</td>
-                          </tr>
-                      </tbody>
+                    <thead>
+                      <tr className="bg-slate-900 text-white">
+                        <th className="px-8 py-6 text-sm font-bold uppercase tracking-wider w-1/4">Feature</th>
+                        <th className="px-8 py-6 text-sm font-bold uppercase tracking-wider bg-indigo-600 w-2/5">AI Chatbot for Website</th>
+                        <th className="px-8 py-6 text-sm font-bold uppercase tracking-wider bg-slate-800 text-slate-300 w-2/5">Human Support Team</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">24/7 Availability</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Operates 24/7 without breaks or holidays</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Limited to office hours</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">Response Time</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Instant replies within seconds</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> May delay during peak hours</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">Cost Efficiency</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Fixed cost, no salary or HR expense</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Salaries, training & overhead costs</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">Lead Automation</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Automatic data capture & CRM sync</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Manual lead collection</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">Scalability</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Easily scalable during high traffic</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Requires hiring more staff</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">Handles Multiple Users</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Unlimited simultaneous conversations</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Limited per agent</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">Accuracy & Consistency</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableCheck /> Structured, consistent answers</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCross /> Human error possible</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">Emotional Intelligence</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-700"><TableWarn /> Handles structured queries well</td>
+                        <td className="px-8 py-5 text-sm text-slate-500"><TableCheck /> Strong emotional understanding</td>
+                      </tr>
+                      <tr className="bg-indigo-50/50">
+                        <td className="px-8 py-5 text-sm font-bold text-indigo-900">Best For</td>
+                        <td className="px-8 py-5 text-sm font-bold text-indigo-700">Lead generation, automation, FAQs, and bookings</td>
+                        <td className="px-8 py-5 text-sm font-medium text-slate-600">Complex, sensitive conversations</td>
+                      </tr>
+                    </tbody>
                   </table>
                 </div>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Benefits & CTA */}
-        <section className="bg-indigo-600 py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          <div className="max-w-5xl mx-auto px-6 relative z-10 text-center text-white">
+          {/* Benefits & CTA */}
+          <section className="bg-indigo-600 py-24 relative overflow-hidden">
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            <div className="max-w-5xl mx-auto px-6 relative z-10 text-center text-white">
               <h2 className="text-4xl font-extrabold mb-8">Which is Better for Business Growth?</h2>
-              
+
               <div className="grid sm:grid-cols-2 md:grid-cols-5 gap-4 mb-12 text-sm font-bold">
                 <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">Increase Engagement</div>
                 <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">Capture Leads Automatically</div>
@@ -162,21 +176,22 @@ export default function Features() {
               </div>
 
               <p className="text-indigo-100 text-xl mb-6 max-w-3xl mx-auto leading-relaxed">
-                If your goal is any of the above, <strong>AI Chatbot for Website</strong> is the smarter, scalable, and cost-effective solution. 
+                If your goal is any of the above, <strong>AI Chatbot for Website</strong> is the smarter, scalable, and cost-effective solution.
                 However, combining AI Chatbot with Human Support creates a powerful hybrid system for maximum efficiency and customer satisfaction.
               </p>
-              
+
               <p className="text-white text-lg font-bold mb-10">
                 Implementing an AI chatbot on your website is no longer optional — it’s a strategic growth decision.
               </p>
 
               <Link href="/register" className="inline-block px-10 py-4 bg-white text-indigo-900 font-extrabold rounded-full text-lg hover:bg-slate-100 shadow-2xl hover:scale-105 transition-all duration-300">
-                  Build Your Free Bot Now
+                Build Your Free Bot Now
               </Link>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </div>
+            </div>
+          </section>
+        </main>
+        <Footer />
+      </div>
+    </>
   );
 }

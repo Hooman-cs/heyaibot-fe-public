@@ -1,14 +1,11 @@
 (function () {
     try {
-        // Get the current script element (this script)
         var currentScript = document.currentScript;
         var appId = '';
         
-        // If we found the current script and it has data-app-id attribute
         if (currentScript && currentScript.hasAttribute('data-app-id')) {
             appId = currentScript.getAttribute('data-app-id');
         } else {
-            // Fallback: search for any script with data-app-id
             var scripts = document.querySelectorAll('script[data-app-id]');
             if (scripts.length > 0) {
                 appId = scripts[scripts.length - 1].getAttribute('data-app-id');
@@ -16,20 +13,16 @@
         }
         
         var iframe = document.createElement('iframe');
-        // var baseUrl = 'http://localhost:3000/Chat';
         var baseUrl = 'https://www.heyaibot.com/Chat';
         
-        // Build URL with appId parameter if available
         var iframeUrl = new URL(baseUrl);
         if (appId) {
             iframeUrl.searchParams.set('appId', appId);
         }
         
-        // Current page URL को भी iframe URL में add करें
         iframeUrl.searchParams.set('sourceUrl', window.location.href);
         iframeUrl.searchParams.set('sourceDomain', window.location.hostname);
         
-        // Function to detect device type
         function detectDeviceType() {
             var screenWidth = window.innerWidth;
             var userAgent = navigator.userAgent;
@@ -46,10 +39,8 @@
             };
         }
         
-        // Initial device detection
         var deviceInfo = detectDeviceType();
         
-        // Send device info to iframe via URL
         iframeUrl.searchParams.set('deviceType', deviceInfo.deviceType);
         iframeUrl.searchParams.set('screenWidth', deviceInfo.screenWidth.toString());
         iframeUrl.searchParams.set('isSmallScreen', deviceInfo.isSmallScreen.toString());
@@ -57,12 +48,39 @@
         iframe.src = iframeUrl.toString();
         iframe.id = 'chat-widget-iframe';
         
-        // Function to update iframe styles based on device
+        var brandingColor = 'tomato';
+        var brandingHoverColor = 'tomato';
+
+        if (appId) {
+            fetch('https://backend-chat1.vercel.app/api/branding/' + appId, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(function(response) {
+                if (!response.ok) return null;
+                return response.json();
+            })
+            .then(function(data) {
+                if (data && data.success && data.data && data.data.headerColor) {
+                    brandingColor = data.data.headerColor;
+                    brandingHoverColor = brandingColor;
+
+                    chatIcon.style.backgroundColor = brandingColor;
+                    chatIcon.style.setProperty('--chat-icon-color', brandingColor);
+                    chatIcon.style.setProperty('--chat-icon-hover', brandingHoverColor);
+
+                    styleTag.textContent = generateStyles(brandingColor, brandingHoverColor);
+                }
+            })
+            .catch(function(error) {
+                console.error('❌ Branding fetch error:', error);
+            });
+        }
+
         function updateIframeStyles(device) {
             if (device.isSmallScreen) {
-                // Mobile/Tablet: Full screen
                 iframe.style.width = '100vw';
-                iframe.style.height = '100vh';
+                iframe.style.height = '100dvh';
                 iframe.style.position = 'fixed';
                 iframe.style.top = '0';
                 iframe.style.left = '0';
@@ -71,18 +89,18 @@
                 iframe.style.borderRadius = '0';
                 iframe.style.boxShadow = 'none';
             } else {
-                // Desktop: Floating widget
                 iframe.style.width = '340px';
                 iframe.style.height = '470px';
                 iframe.style.position = 'fixed';
                 iframe.style.bottom = '90px';
                 iframe.style.right = '20px';
+                iframe.style.top = 'auto';
+                iframe.style.left = 'auto';
                 iframe.style.borderRadius = '12px';
                 iframe.style.boxShadow = '0 10px 30px rgba(0,0,0,0.15)';
             }
         }
         
-        // Set initial iframe styles
         updateIframeStyles(deviceInfo);
         
         iframe.style.zIndex = '999998';
@@ -91,46 +109,37 @@
         iframe.style.transform = deviceInfo.isSmallScreen ? 'translateY(100%)' : 'translateY(20px) scale(0.95)';
         iframe.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
         iframe.style.pointerEvents = 'none';
-        
-        // Remove blur effects
         iframe.style.filter = 'none';
         iframe.style.backdropFilter = 'none';
         iframe.style.webkitBackdropFilter = 'none';
         
-        // Store appId in iframe data attribute
         if (appId) {
             iframe.setAttribute('data-app-id', appId);
         }
         
-        // Store device info in iframe data attributes
         iframe.setAttribute('data-source-url', window.location.href);
         iframe.setAttribute('data-source-domain', window.location.hostname);
         iframe.setAttribute('data-device-type', deviceInfo.deviceType);
         iframe.setAttribute('data-screen-width', deviceInfo.screenWidth.toString());
         
-        // Create chat icon button
         var chatIcon = document.createElement('div');
         chatIcon.id = 'chat-widget-icon';
         chatIcon.innerHTML = `
-            <!-- Chat icon (message bubble) -->
             <svg id="chat-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); opacity: 1; transform: scale(1) rotate(0deg);">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
-            
-            <!-- Close icon (hidden by default) -->
             <svg id="close-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; opacity: 0; transform: rotate(45deg) scale(0.5); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         `;
         
-        // Style the chat icon container
         chatIcon.style.position = 'fixed';
         chatIcon.style.bottom = '20px';
         chatIcon.style.right = '20px';
         chatIcon.style.width = '60px';
         chatIcon.style.height = '60px';
-        chatIcon.style.backgroundColor = 'tomato';
+        chatIcon.style.backgroundColor = brandingColor;
         chatIcon.style.borderRadius = '50%';
         chatIcon.style.display = 'flex';
         chatIcon.style.alignItems = 'center';
@@ -141,155 +150,130 @@
         chatIcon.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
         chatIcon.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
         chatIcon.style.color = 'white';
-        
-        // Add CSS for animations and responsive styles
-        var style = document.createElement('style');
-        style.textContent = `
-            #chat-widget-icon {
-                --chat-icon-color: tomato;
-                --chat-icon-hover: #ff4500;
-            }
-            
-            #chat-widget-icon:hover {
-                transform: scale(1.1);
-                background-color: var(--chat-icon-hover);
-            }
-            
-            #chat-widget-icon:active {
-                transform: scale(1.05);
-            }
-            
-            /* Chat icon animation when iframe is open */
-            #chat-widget-icon.open #chat-icon-svg {
-                opacity: 0 !important;
-                transform: rotate(-180deg) scale(0.5) !important;
-            }
-            
-            /* Close icon animation when iframe is open */
-            #chat-widget-icon.open #close-icon-svg {
-                opacity: 1 !important;
-                transform: rotate(0deg) scale(1) !important;
-            }
-            
-            /* Icon bounce animation */
-            @keyframes iconBounce {
-                0%, 100% { transform: scale(1); }
-                50% { transform: scale(1.15); }
-            }
-            
-            /* Initial animation when widget loads */
-            #chat-widget-icon {
-                animation: iconBounce 2s ease-in-out 1s 3;
-            }
-            
-            /* Hide chat icon on mobile/tablet when iframe is open */
-            #chat-widget-icon.hidden {
-                display: none !important;
-            }
-            
-            /* Make iframe always on top when open */
-            #chat-widget-iframe[style*="opacity: 1"] {
-                z-index: 999999 !important;
-            }
-            
-            /* Responsive iframe styles */
-            @media (max-width: 768px) {
-                #chat-widget-iframe {
-                    width: 100vw !important;
-                    height: 100vh !important;
+
+        function generateStyles(color, hoverColor) {
+            return `
+                #chat-widget-icon {
+                    --chat-icon-color: ${color};
+                    --chat-icon-hover: ${hoverColor};
+                }
+                #chat-widget-icon:hover {
+                    transform: scale(1.1);
+                    background-color: ${hoverColor} !important;
+                }
+                #chat-widget-icon:active {
+                    transform: scale(1.05);
+                }
+                #chat-widget-icon.open #chat-icon-svg {
+                    opacity: 0 !important;
+                    transform: rotate(-180deg) scale(0.5) !important;
+                }
+                #chat-widget-icon.open #close-icon-svg {
+                    opacity: 1 !important;
+                    transform: rotate(0deg) scale(1) !important;
+                }
+                @keyframes iconBounce {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.15); }
+                }
+                #chat-widget-icon {
+                    animation: iconBounce 2s ease-in-out 1s 3;
+                }
+                #chat-widget-icon.hidden {
+                    display: none !important;
+                }
+                body.iframe-open-mobile {
+                    overflow: hidden !important;
+                    position: fixed !important;
+                    width: 100% !important;
+                    height: 100% !important;
                     top: 0 !important;
                     left: 0 !important;
                     right: 0 !important;
                     bottom: 0 !important;
-                    border-radius: 0 !important;
-                    transform: translateY(100%) !important;
                 }
-                
-                #chat-widget-iframe[style*="opacity: 1"] {
-                    transform: translateY(0) !important;
-                }
-            }
-            
-            @media (min-width: 769px) {
-                #chat-widget-iframe {
-                    width: 340px !important;
-                    height: 470px !important;
-                    bottom: 90px !important;
-                    right: 20px !important;
-                    left: auto !important;
-                    top: auto !important;
-                    border-radius: 12px !important;
-                    transform: translateY(20px) scale(0.95) !important;
-                }
-                
-                #chat-widget-iframe[style*="opacity: 1"] {
-                    transform: translateY(0) scale(1) !important;
-                }
-            }
-        `;
+            `;
+        }
         
-        document.head.appendChild(style);
+        var styleTag = document.createElement('style');
+        styleTag.textContent = generateStyles(brandingColor, brandingHoverColor);
+        document.head.appendChild(styleTag);
         
-        // State variable to track if iframe is open
         var isIframeOpen = false;
         var previousIsSmallScreen = deviceInfo.isSmallScreen;
+        var isKeyboardOpen = false;
         
-        // Function to open iframe
+        function detectKeyboard() {
+            if (!deviceInfo.isSmallScreen) return;
+            var originalHeight = window.innerHeight;
+            window.addEventListener('resize', function() {
+                if (!isIframeOpen) return;
+                var currentHeight = window.innerHeight;
+                var heightDiff = originalHeight - currentHeight;
+                if (heightDiff > 100) {
+                    isKeyboardOpen = true;
+                    document.body.classList.add('keyboard-open');
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ type: 'keyboardState', isOpen: true, keyboardHeight: heightDiff }, baseUrl);
+                    }
+                } else if (isKeyboardOpen && heightDiff <= 100) {
+                    isKeyboardOpen = false;
+                    document.body.classList.remove('keyboard-open');
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ type: 'keyboardState', isOpen: false, keyboardHeight: 0 }, baseUrl);
+                    }
+                }
+                originalHeight = currentHeight;
+            });
+        }
+        
+        detectKeyboard();
+        
+        function preventBodyScroll(prevent) {
+            if (deviceInfo.isSmallScreen) {
+                if (prevent) {
+                    document.body.classList.add('iframe-open-mobile');
+                } else {
+                    document.body.classList.remove('iframe-open-mobile');
+                }
+            }
+        }
+        
         function openIframe() {
             isIframeOpen = true;
-            
-            // Show iframe with animation
+            preventBodyScroll(true);
             iframe.style.opacity = '1';
             iframe.style.pointerEvents = 'auto';
-            
+            iframe.style.zIndex = '999999';
             if (deviceInfo.isSmallScreen) {
-                // Mobile/Tablet: Slide up from bottom
                 iframe.style.transform = 'translateY(0)';
-                // Hide chat icon on mobile/tablet when iframe is open
                 chatIcon.classList.add('hidden');
             } else {
-                // Desktop: Scale in
                 iframe.style.transform = 'translateY(0) scale(1)';
-                // Change icon to close
                 chatIcon.classList.add('open');
-                chatIcon.style.backgroundColor = '#ff4500';
+                chatIcon.style.backgroundColor = brandingHoverColor;
             }
-            
-            // Add bounce animation to icon
-            chatIcon.style.animation = 'iconBounce 0.5s ease';
-            
-            // Ensure iframe is on top
-            iframe.style.zIndex = '999999';
         }
         
-        // Function to close iframe
         function closeIframe() {
             isIframeOpen = false;
-            
-            // Hide iframe with animation
+            preventBodyScroll(false);
             iframe.style.opacity = '0';
             iframe.style.pointerEvents = 'none';
-            
+            iframe.style.zIndex = '999998';
             if (deviceInfo.isSmallScreen) {
-                // Mobile/Tablet: Slide down
                 iframe.style.transform = 'translateY(100%)';
-                // Show chat icon again
                 chatIcon.classList.remove('hidden');
             } else {
-                // Desktop: Scale out
                 iframe.style.transform = 'translateY(20px) scale(0.95)';
-                // Change back to chat icon
                 chatIcon.classList.remove('open');
-                chatIcon.style.backgroundColor = 'tomato';
+                chatIcon.style.backgroundColor = brandingColor;
             }
-            
             chatIcon.style.animation = '';
-            
-            // Reset z-index when closed
-            iframe.style.zIndex = '999998';
+            document.body.classList.remove('keyboard-open');
+            isKeyboardOpen = false;
         }
         
-        // Toggle iframe visibility
         function toggleIframe() {
             if (isIframeOpen) {
                 closeIframe();
@@ -298,33 +282,19 @@
             }
         }
         
-        // Add click event to chat icon
         chatIcon.addEventListener('click', function(e) {
             e.stopPropagation();
             toggleIframe();
         });
         
-        // Prevent iframe clicks from bubbling (but keep iframe functional)
         iframe.addEventListener('click', function(e) {
             e.stopPropagation();
-            // Do NOT close the iframe when clicking inside it
         });
         
-        // Listen for messages from iframe to control icon state
         window.addEventListener('message', function(event) {
-            // Check if message is from our iframe
             if (event.source === iframe.contentWindow) {
-                // Listen for close-chat message (from header cross icon)
-                if (event.data === 'close-chat') {
-                    closeIframe();
-                }
-                
-                // Listen for open-chat message
-                if (event.data === 'open-chat') {
-                    openIframe();
-                }
-                
-                // Listen for device info requests
+                if (event.data === 'close-chat') { closeIframe(); }
+                if (event.data === 'open-chat') { openIframe(); }
                 if (event.data.type === 'requestDeviceInfo') {
                     iframe.contentWindow.postMessage({
                         type: 'deviceInfo',
@@ -335,40 +305,29 @@
                         deviceType: deviceInfo.deviceType
                     }, baseUrl);
                 }
+                if (event.data.type === 'lockScroll') { preventBodyScroll(event.data.lock); }
+                if (event.data.type === 'getKeyboardState') {
+                    iframe.contentWindow.postMessage({ type: 'keyboardState', isOpen: isKeyboardOpen, keyboardHeight: isKeyboardOpen ? 300 : 0 }, baseUrl);
+                }
             }
         });
         
-        // Handle window resize - dynamically update layout
         function handleResize() {
             var newDeviceInfo = detectDeviceType();
             
-            // Always update device info on resize
             var deviceChanged = (
-                newDeviceInfo.isSmallScreen !== previousIsSmallScreen ||
-                newDeviceInfo.screenWidth !== deviceInfo.screenWidth ||
+                newDeviceInfo.isSmallScreen !== deviceInfo.isSmallScreen ||
                 newDeviceInfo.deviceType !== deviceInfo.deviceType
             );
-            
+
+            // ✅ KEY FIX: deviceInfo update karo but iframe.src mat badlo
+            deviceInfo = newDeviceInfo;
+
             if (deviceChanged) {
-                previousIsSmallScreen = newDeviceInfo.isSmallScreen;
-                deviceInfo = newDeviceInfo;
-                
-                // Update iframe URL params
-                var newIframeUrl = new URL(iframe.src);
-                newIframeUrl.searchParams.set('screenWidth', deviceInfo.screenWidth.toString());
-                newIframeUrl.searchParams.set('isSmallScreen', deviceInfo.isSmallScreen.toString());
-                newIframeUrl.searchParams.set('deviceType', deviceInfo.deviceType);
-                iframe.src = newIframeUrl.toString();
-                
-                // Update iframe data attributes
-                iframe.setAttribute('data-screen-width', deviceInfo.screenWidth.toString());
-                iframe.setAttribute('data-is-small-screen', deviceInfo.isSmallScreen.toString());
-                iframe.setAttribute('data-device-type', deviceInfo.deviceType);
-                
-                // Update iframe styles based on new device info
+                // ✅ Sirf CSS/styles update karo — iframe reload NAHI
                 updateIframeStyles(deviceInfo);
-                
-                // Send updated device info to iframe
+
+                // ✅ Iframe ko postMessage se device info bhejo (reload ke bina)
                 if (iframe.contentWindow) {
                     iframe.contentWindow.postMessage({
                         type: 'screenResize',
@@ -377,115 +336,73 @@
                         isSmallScreen: deviceInfo.isSmallScreen,
                         screenWidth: deviceInfo.screenWidth,
                         deviceType: deviceInfo.deviceType
-                    }, baseUrl);
+                    }, '*');
                 }
-                
-                // Handle iframe open/close state and icon appearance
+
+                // ✅ Open state ke hisaab se position fix karo
                 if (isIframeOpen) {
-                    // Iframe is open, update its position
                     if (deviceInfo.isSmallScreen) {
-                        // Switching to mobile/tablet view
+                        iframe.style.opacity = '1';
                         iframe.style.transform = 'translateY(0)';
-                        // Hide chat icon
+                        iframe.style.pointerEvents = 'auto';
+                        iframe.style.zIndex = '999999';
                         chatIcon.classList.add('hidden');
-                        // Remove desktop open class
                         chatIcon.classList.remove('open');
+                        preventBodyScroll(true);
                     } else {
-                        // Switching to desktop view
+                        iframe.style.opacity = '1';
                         iframe.style.transform = 'translateY(0) scale(1)';
-                        // Show chat icon as close icon
+                        iframe.style.pointerEvents = 'auto';
+                        iframe.style.zIndex = '999999';
                         chatIcon.classList.remove('hidden');
                         chatIcon.classList.add('open');
-                        chatIcon.style.backgroundColor = '#ff4500';
+                        chatIcon.style.backgroundColor = brandingHoverColor;
+                        preventBodyScroll(false);
                     }
                 } else {
-                    // Iframe is closed, update transform based on device
                     if (deviceInfo.isSmallScreen) {
+                        iframe.style.opacity = '0';
                         iframe.style.transform = 'translateY(100%)';
-                        // Show chat icon
+                        iframe.style.pointerEvents = 'none';
                         chatIcon.classList.remove('hidden');
                         chatIcon.classList.remove('open');
-                        chatIcon.style.backgroundColor = 'tomato';
+                        chatIcon.style.backgroundColor = brandingColor;
                     } else {
+                        iframe.style.opacity = '0';
                         iframe.style.transform = 'translateY(20px) scale(0.95)';
-                        // Show chat icon
+                        iframe.style.pointerEvents = 'none';
                         chatIcon.classList.remove('hidden');
                         chatIcon.classList.remove('open');
-                        chatIcon.style.backgroundColor = 'tomato';
+                        chatIcon.style.backgroundColor = brandingColor;
                     }
+                    preventBodyScroll(false);
                 }
             }
         }
         
-        // Add resize listener with debouncing
         var resizeTimeout;
         window.addEventListener('resize', function() {
             clearTimeout(resizeTimeout);
             resizeTimeout = setTimeout(handleResize, 250);
         });
         
-        // Append elements to body
         document.body.appendChild(iframe);
         document.body.appendChild(chatIcon);
         
-        // Send message to iframe about appId when it loads
         iframe.addEventListener('load', function() {
             if (appId) {
-                iframe.contentWindow.postMessage({
-                    type: 'appId',
-                    appId: appId
-                }, baseUrl);
-                
-                // Send current URL
-                iframe.contentWindow.postMessage({
-                    type: 'pageUrl',
-                    url: window.location.href,
-                    domain: window.location.hostname,
-                    pageTitle: document.title,
-                    timestamp: new Date().toISOString()
-                }, baseUrl);
-                
-                // Send device info
-                iframe.contentWindow.postMessage({
-                    type: 'deviceInfo',
-                    isMobile: deviceInfo.isMobile,
-                    isTablet: deviceInfo.isTablet,
-                    isSmallScreen: deviceInfo.isSmallScreen,
-                    screenWidth: deviceInfo.screenWidth,
-                    deviceType: deviceInfo.deviceType
-                }, baseUrl);
+                iframe.contentWindow.postMessage({ type: 'appId', appId: appId }, baseUrl);
+                iframe.contentWindow.postMessage({ type: 'pageUrl', url: window.location.href, domain: window.location.hostname, pageTitle: document.title, timestamp: new Date().toISOString() }, baseUrl);
+                iframe.contentWindow.postMessage({ type: 'deviceInfo', isMobile: deviceInfo.isMobile, isTablet: deviceInfo.isTablet, isSmallScreen: deviceInfo.isSmallScreen, screenWidth: deviceInfo.screenWidth, deviceType: deviceInfo.deviceType }, baseUrl);
+                iframe.contentWindow.postMessage({ type: 'safeArea', top: getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0px', bottom: getComputedStyle(document.documentElement).getPropertyValue('--sab') || '0px', left: getComputedStyle(document.documentElement).getPropertyValue('--sal') || '0px', right: getComputedStyle(document.documentElement).getPropertyValue('--sar') || '0px' }, baseUrl);
             }
         });
         
-        // Function to close iframe programmatically
-        window.closeChatWidget = function() {
-            if (isIframeOpen) {
-                closeIframe();
-            }
-        };
-        
-        // Function to open iframe programmatically
-        window.openChatWidget = function() {
-            if (!isIframeOpen) {
-                openIframe();
-            }
-        };
-        
-        // Function to get current iframe state
+        window.closeChatWidget = function() { if (isIframeOpen) closeIframe(); };
+        window.openChatWidget = function() { if (!isIframeOpen) openIframe(); };
         window.getChatWidgetState = function() {
-            return {
-                isOpen: isIframeOpen,
-                appId: appId,
-                currentUrl: window.location.href,
-                currentDomain: window.location.hostname,
-                pageTitle: document.title,
-                fullUrl: window.location.href,
-                installationTime: new Date().toISOString(),
-                deviceInfo: deviceInfo
-            };
+            return { isOpen: isIframeOpen, appId: appId, currentUrl: window.location.href, currentDomain: window.location.hostname, pageTitle: document.title, fullUrl: window.location.href, installationTime: new Date().toISOString(), deviceInfo: deviceInfo };
         };
-        
-        // Make functions available globally
         window.toggleChatWidget = toggleIframe;
         
     } catch (error) {

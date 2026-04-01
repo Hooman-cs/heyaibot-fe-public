@@ -1,4 +1,9 @@
 import Link from "next/link";
+import { useState, useEffect } from 'react';
+import { 
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+    Tooltip as RechartsTooltip, ResponsiveContainer 
+} from 'recharts';
 
 export default function OverviewTab({ 
   isAdmin, 
@@ -15,12 +20,11 @@ export default function OverviewTab({
   walletBalance    
 }) {
   
-  // Format the expiration date cleanly (e.g., "Oct 25, 2024")
   const formattedExpireDate = expireDate 
     ? new Date(expireDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) 
     : null;
 
-  // UPDATED: Admin cards now show split revenue and unique active users
+  // --- 1. QUICK STATS CARDS ---
   const overviewCards = isAdmin 
     ? [
         { label: "Subscription Revenue", val: `₹${adminStats?.subRevenueInr || 0} | $${adminStats?.subRevenueUsd || 0}`, icon: "💳" },
@@ -29,80 +33,180 @@ export default function OverviewTab({
       ]
     : [
         { label: "Total Conversations", val: totalConversationsCount?.toString() || "0", icon: "💬" },
-        { label: "Total Leads Captured", val: totalLeadsCount?.toString() || "0", icon: "🧲" }, 
-        { label: "Active Bots", val: `${bots?.length || 0} / ${allowedBots}`, icon: "🤖" },
-        { label: "Booster Tokens", val: walletBalance?.toLocaleString() || "0", icon: "🚀" } 
+        { label: "Leads Captured", val: totalLeadsCount?.toString() || "0", icon: "🧲" },
+        { label: "Active Chatbots", val: `${bots?.length || 0} / ${allowedBots}`, icon: "🤖" },
+        { label: "Token Wallet", val: walletBalance?.toLocaleString() || "0", icon: "⚡" }
       ];
 
+  // --- 2. 30-DAY ANALYTICS FETCHING ---
+  const [chartData, setChartData] = useState([]);
+  const [chartLoading, setChartLoading] = useState(true);
+  const apiKey = session?.user?.apiKey || "a357c710-97f8-4f46-ba26-b5024d6a1c37"; // Fallback for dev
+
+  useEffect(() => {
+    setChartLoading(true);
+
+    if (isAdmin) {
+      // Admin: Fetch 30-Day USD Revenue & Users
+      fetch("/api/admin/analytics?range=30d&currency=USD")
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success && resData.graph) {
+            const formattedData = resData.graph.map(point => ({
+              label: point.label,
+              revenue: point.subRevenue + point.boosterRevenue,
+              users: point.activeUsers
+            }));
+            setChartData(formattedData);
+          }
+          setChartLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to load admin overview chart", err);
+          setChartLoading(false);
+        });
+    } else {
+      // User: Fetch 30-Day Chats & Leads from Chatbot Backend
+      const url = `https://backend-chat1.vercel.app/analytics/graph?apiKey=${apiKey}&backendApiKey=${apiKey}&range=30d&source=both`;
+      fetch(url)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success) {
+            const chatsGraph = resData.chats?.graph || [];
+            const leadsGraph = resData.leads?.graph || [];
+            
+            const merged = chatsGraph.map((c, i) => ({
+              label: c.label,
+              messages: c.messages || 0,
+              leads: leadsGraph[i]?.totalLeads || leadsGraph[i]?.leads || leadsGraph[i]?.total || 0
+            }));
+            setChartData(merged);
+          }
+          setChartLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to load user overview chart", err);
+          setChartLoading(false);
+        });
+    }
+  }, [isAdmin, apiKey]);
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-100 text-sm">
+          <p className="font-bold text-slate-500 mb-2">{label}</p>
+          {payload.map((entry, index) => (
+            <div key={index} className="flex justify-between gap-4 mb-1">
+              <span className="font-semibold" style={{ color: entry.color }}>{entry.name}</span>
+              <span className="font-black text-slate-800">
+                {entry.name.includes("Revenue") ? `$${entry.value}` : entry.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <>
-      <div className="mb-8 lg:mb-10">
-        <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-2">
-          Welcome back, {session?.user?.name?.split(' ')[0]} 👋
-        </h1>
-        <p className="text-slate-500 text-base lg:text-lg font-medium">
-          {isAdmin ? "Here is your platform overview and administrative controls." : "Here's what's happening with your AI assistants today."}
-        </p>
+    <div className="space-y-6 lg:space-y-8 max-w-[1600px] mx-auto">
+      
+      {/* 1. WELCOME HEADER */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 lg:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+            Welcome back, {session?.user?.name?.split(' ')[0] || "User"}! 👋
+          </h1>
+          <p className="text-slate-500 font-medium mt-1">
+            {isAdmin ? "Here is your global platform performance." : "Here is how your chatbots are performing today."}
+          </p>
+        </div>
+        {/* ✅ FIX 1: Removed the !isAdmin check so you (Admin) can see the button too! */}
+        <a href="/api/launch-studio" className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm transition-all hover:-translate-y-0.5 whitespace-nowrap">
+          Launch Studio &rarr;
+        </a>
       </div>
 
-      {/* UPDATED GRID: Admins get 3 columns (md:grid-cols-3) to fit the new cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isAdmin ? 'md:grid-cols-3' : 'lg:grid-cols-4'} gap-4 lg:gap-6 mb-10`}>
-        {overviewCards.map((stat, i) => (
-          <div key={i} className="bg-white p-5 lg:p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-4">
-                <div className="text-xs lg:text-sm font-bold text-slate-400 uppercase tracking-widest">{stat.label}</div>
-                <div className="text-xl lg:text-2xl opacity-50">{stat.icon}</div>
+      {/* 2. QUICK STATS CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        {overviewCards.map((card, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">
+              <span>{card.icon}</span> {card.label}
             </div>
-            <div className="text-3xl lg:text-4xl font-extrabold text-slate-900">{stat.val}</div>
+            <div className={`text-3xl lg:text-4xl font-black ${isAdmin && i < 2 ? 'text-indigo-600' : 'text-slate-900'}`}>
+              {card.val}
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-gradient-to-br from-indigo-900 via-indigo-800 to-blue-900 p-6 lg:p-8 rounded-3xl shadow-xl border border-indigo-700 relative overflow-hidden text-white">
-          <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-500 opacity-20 rounded-full blur-3xl"></div>
-          <div className="relative z-10">
-            <div className="w-12 h-12 lg:w-14 lg:h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-2xl lg:text-3xl mb-6">
-              {isAdmin ? "⚙️" : "🤖"}
-            </div>
-            <h2 className="text-2xl lg:text-3xl font-extrabold mb-3">
-              {isAdmin ? "Platform Configuration" : "Launch Chatbot Studio"}
-            </h2>
-            <p className="text-indigo-200 mb-8 max-w-lg text-base lg:text-lg font-light">
-              {isAdmin 
-                ? "Manage your SaaS pricing tiers, feature flags, and global platform settings."
-                : "Enter the studio to build, train, and configure your AI agents. Update your knowledge base or create a new bot."}
+      {/* 3. 30-DAY PERFORMANCE TREND */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 lg:p-8 shadow-sm">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-black text-slate-800">30-Day Performance Trend</h3>
+            <p className="text-sm font-medium text-slate-500">
+              {isAdmin ? "Global Revenue vs Active Users (USD)" : "Messages Processed vs Leads Captured"}
             </p>
-            
-            {isAdmin ? (
-              <div className="flex flex-wrap gap-3">
-                <a href="/api/launch-studio" className="inline-flex items-center px-6 lg:px-8 py-3 lg:py-4 bg-white text-indigo-900 rounded-xl font-bold hover:bg-indigo-50 hover:scale-105 transition-all text-sm lg:text-base">
-                  Open Super Admin &rarr;
-                </a>
-                <button onClick={() => handleNavClick("Billing Management")} className="inline-flex items-center px-6 lg:px-8 py-3 lg:py-4 bg-indigo-800/50 text-white rounded-xl font-bold hover:bg-indigo-800 transition-all text-sm lg:text-base">
-                  Manage Plans
-                </button>
-              </div>
-            ) : (
-              <a href="/api/launch-studio" className="inline-flex items-center px-6 lg:px-8 py-3 lg:py-4 bg-white text-indigo-900 rounded-xl font-bold hover:bg-indigo-50 hover:scale-105 transition-all text-sm lg:text-base">
-                Open Studio &rarr;
-              </a>
-            )}
           </div>
+          <button onClick={() => handleNavClick('Analytics')} className="text-indigo-600 hover:text-indigo-800 text-sm font-bold transition-colors">
+            View Full Analytics &rarr;
+          </button>
         </div>
 
-        <div className="bg-white p-6 lg:p-8 rounded-3xl shadow-sm border border-slate-200 flex flex-col relative">
-          <div className="flex-1">
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-              <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-2xl">
-                {isAdmin ? "👑" : "💳"}
-              </div>
-              {!isAdmin && (
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${currentStatus.bg} ${currentStatus.text} ${currentStatus.border}`}>
-                    {subStatus}
-                </span>
-              )}
+        <div className="h-[280px] w-full">
+          {chartLoading ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full"></div>
             </div>
+          ) : chartData.length === 0 ? (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 font-medium">
+              No data available for the last 30 days.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPrimary" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorSecondary" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} minTickGap={30} />
+                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                <RechartsTooltip content={<CustomTooltip />} />
+                
+                {isAdmin ? (
+                  <>
+                    <Area yAxisId="left" type="monotone" dataKey="revenue" name="Total Revenue" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorPrimary)" />
+                    <Area yAxisId="right" type="monotone" dataKey="users" name="Active Users" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorSecondary)" />
+                  </>
+                ) : (
+                  <>
+                    <Area yAxisId="left" type="monotone" dataKey="messages" name="Total Messages" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorPrimary)" />
+                    <Area yAxisId="right" type="monotone" dataKey="leads" name="Leads Captured" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorSecondary)" />
+                  </>
+                )}
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* 4. BOTTOM SECTION: PLAN STATUS */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 lg:p-8 shadow-sm">
+        <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-10">
+          
+          <div className="flex-1 w-full text-center lg:text-left">
             <h2 className="text-xs lg:text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">
               {isAdmin ? "Access Level" : "Current Plan"}
             </h2>
@@ -118,20 +222,29 @@ export default function OverviewTab({
           </div>
           
           {isAdmin ? (
-            <button onClick={() => handleNavClick('Revenue')} className="w-full text-center py-3 lg:py-4 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all text-sm lg:text-base">
+            <button onClick={() => handleNavClick('Revenue')} className="w-full lg:w-auto px-8 py-3 lg:py-4 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all text-sm lg:text-base whitespace-nowrap">
               View Global Revenue
             </button>
           ) : (
-            <Link href="/pricing" className="w-full text-center py-3 lg:py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all text-sm lg:text-base">
+            <Link href="/pricing" className="w-full lg:w-auto px-8 py-3 lg:py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all text-sm lg:text-base whitespace-nowrap text-center">
               Upgrade / Buy Tokens
             </Link>
           )}
+
+          {/* ✅ FIX 2: Wrapped the Status block in an !isAdmin check so Admins don't see "Loading..." */}
+          {!isAdmin && (
+            <div className={`w-full lg:w-auto px-6 py-4 rounded-xl border ${currentStatus?.bg} ${currentStatus?.border} flex items-center justify-center gap-3 shadow-inner`}>
+              <span className={`text-xl ${currentStatus?.text}`}>{currentStatus?.icon}</span>
+              <div>
+                <div className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${currentStatus?.text} opacity-80`}>Status</div>
+                <div className={`text-sm font-black ${currentStatus?.text}`}>{subStatus}</div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
-      {/* Put this right under the grid of Top Cards
-      {isAdmin && (
-         <AdminAnalyticsCharts stats={adminStats} />
-      )} */}
-    </>
+
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Navbar from '../app/Navbar';
 import Footer from '../app/Footer';
 import Link from 'next/link';
+import Head from "next/head";
 
 const AccordionItem = ({ question, answer, isOpen, onClick }) => {
   return (
@@ -73,6 +74,12 @@ export default function FAQ() {
   };
 
   return (
+    <>
+    <Head>
+        <title>FAQ - Hey AI Bot</title>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="canonical" href="https://www.heyaibot.com/faq" />
+      </Head>
     <div className="flex flex-col min-h-screen font-sans bg-slate-50">
       <Navbar />
       
@@ -130,5 +137,6 @@ export default function FAQ() {
       </main>
       <Footer />
     </div>
+    </>
   );
 }

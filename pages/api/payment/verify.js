@@ -98,7 +98,8 @@ export default async function handler(req, res) {
       const plan = await getPlanById(planId);
       if (!plan) return res.redirect('/pricing?error=PlanNotFound');
 
-      const durationDays = billingCycle === 'yearly' ? 365 : (plan.duration || 30);
+      // const durationDays = billingCycle === 'yearly' ? 365 : (plan.duration || 30);
+      const durationDays = billingCycle === 'yearly' ? 365 : 30;
       const graceDays = plan.grace_period || 7;
       
       const expireDate = new Date();
@@ -118,7 +119,8 @@ export default async function handler(req, res) {
       const subResult = await createSubscription({
         // Save the actual Stripe Subscription ID so the webhook can find it later!
         paymentId: stripeSession.subscription || stripeSession.payment_intent,
-        orderId: stripeSession.id,
+        // orderId: stripeSession.id,
+        orderId: stripeSession.subscription,
         userId: userId,
         planId: plan.plan_id,
         amount: actualPaidUsd, 
