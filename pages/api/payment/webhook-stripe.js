@@ -1,15 +1,16 @@
 import Stripe from "stripe";
 import { getSubscriptionByOrderId, createSubscription } from "../../../app/model/subscription-db";
 import { getPlanById } from "../../../app/model/plan-db";
+import { updateUserPlan } from "../../../app/model/user-db"; 
+import { docClient } from "../../../app/model/dynamodb"; 
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// ✅ CRITICAL: Stripe requires the raw body to verify signatures. We MUST disable the default Next.js parser.
 export const config = {
   api: { bodyParser: false },
 };
 
-// Helper function to read the raw body buffer
 async function buffer(readable) {
   const chunks = [];
   for await (const chunk of readable) {
@@ -25,7 +26,6 @@ export default async function handler(req, res) {
   let event;
 
   try {
-    // 1. Verify the request actually came from Stripe
     const rawBody = await buffer(req);
     event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
@@ -33,56 +33,89 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // 2. Listen specifically for successful recurring payments
-  if (event.type === "invoice.payment_succeeded") {
-    const invoice = event.data.object;
+  try {
+    // ==========================================
+    // 1. HANDLE AUTO-RENEWALS (And Prevent Duplicates)
+    // ==========================================
+    if (event.type === "invoice.paid") {
+      const invoice = event.data.object;
 
-    // We only care about invoices that belong to a recurring subscription
-    if (invoice.subscription) {
-      try {
-        // Find the original subscription in our database using the Stripe Subscription ID
-        const originalSub = await getSubscriptionByOrderId(invoice.subscription);
-        
-        if (originalSub) {
-          // Fetch the plan details to know how many days to add
-          const plan = await getPlanById(originalSub.plan_id);
+      // Prevent Duplicate DB Records
+      if (invoice.billing_reason === "subscription_create") {
+        console.log("⏭️ Skipping initial invoice.paid event to prevent duplicate subscription.");
+        return res.status(200).json({ received: true });
+      }
+
+      const originalSub = await getSubscriptionByOrderId(invoice.subscription);
+
+      if (originalSub) {
+        const plan = await getPlanById(originalSub.plan_id);
+        if (plan) {
+          // ✅ FIX 1: Dynamically determine duration based on billing cycle!
+          const isYearly = originalSub.billing_cycle === "yearly";
+          const durationDays = isYearly ? 365 : 30;
+          const graceDays = plan.grace_period || 7;
           
-          if (plan) {
-            const durationDays = originalSub.billing_cycle === 'yearly' ? 365 : (plan.duration || 30);
-            const graceDays = plan.grace_period || 7;
-            
-            const expireDate = new Date();
-            expireDate.setDate(expireDate.getDate() + durationDays);
-            
-            const graceExpireDate = new Date(expireDate);
-            graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
+          const expireDate = new Date();
+          expireDate.setDate(expireDate.getDate() + durationDays);
+          
+          const graceExpireDate = new Date(expireDate);
+          graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
 
-            // Create a NEW row in the database for this month's receipt!
-            await createSubscription({
-              paymentId: invoice.payment_intent || `auto_${Date.now()}`,
-              orderId: invoice.subscription, // Keeps the same recurring ID!
-              userId: originalSub.user_id,
-              planId: originalSub.plan_id,
-              amount: invoice.amount_paid / 100, // Stripe amounts are in cents
-              currency: "USD",
-              gateway: "Stripe Auto-Renewal", // Differentiate from manual checkout
-              billing_cycle: originalSub.billing_cycle,
-              expireDate: expireDate.toISOString(),
-              graceExpireDate: graceExpireDate.toISOString(),
-              system_features: originalSub.snapshot_system_features,
-              display_features: originalSub.snapshot_display_features
-            });
-            
-            console.log(`✅ Successfully auto-renewed subscription for User: ${originalSub.user_id}`);
-          }
+          // ✅ FIX 2: Safely extract old snapshot features
+          const safeSystemFeatures = originalSub.snapshot_system_features || originalSub.snapshot_features || {};
+          const safeDisplayFeatures = originalSub.snapshot_display_features || [];
+
+          // Create auto-renewal row
+          await createSubscription({
+            paymentId: invoice.payment_intent || `auto_${Date.now()}`,
+            orderId: invoice.subscription, 
+            userId: originalSub.user_id,
+            planId: originalSub.plan_id,
+            amount: invoice.amount_paid / 100, 
+            currency: "USD",
+            gateway: "Stripe Auto-Renewal",
+            billing_cycle: originalSub.billing_cycle,
+            expireDate: expireDate.toISOString(),
+            graceExpireDate: graceExpireDate.toISOString(),
+            system_features: safeSystemFeatures,
+            display_features: safeDisplayFeatures
+          });
+
+          // Ensure user's profile is updated on renewal
+          await updateUserPlan(originalSub.user_id, originalSub.plan_id);
+          
+          console.log(`✅ Auto-renewed Stripe subscription for User: ${originalSub.user_id} (${originalSub.billing_cycle})`);
         }
-      } catch (err) {
-        console.error("Error processing Stripe auto-renewal:", err);
-        return res.status(500).json({ error: "Database update failed" });
       }
     }
-  }
 
-  // Tell Stripe we received the message so they don't keep retrying
-  res.status(200).json({ received: true });
+    // ==========================================
+    // 2. HANDLE CANCELLATIONS
+    // ==========================================
+    if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.canceled") {
+      const subEntity = event.data.object;
+      const dbSub = await getSubscriptionByOrderId(subEntity.id);
+
+      if (dbSub) {
+        // Mark subscription as Expired in the ledger
+        await docClient.send(new UpdateCommand({
+          TableName: "Subscriptions",
+          Key: { payment_id: dbSub.payment_id },
+          UpdateExpression: "set #st = :exp",
+          ExpressionAttributeNames: { "#st": "status" },
+          ExpressionAttributeValues: { ":exp": "Expired" }
+        }));
+
+        // Remove plan access from the user's main profile
+        await updateUserPlan(dbSub.user_id, "none");
+        console.log(`🚫 Cancelled Stripe subscription for User: ${dbSub.user_id}`);
+      }
+    }
+
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error("Error processing Stripe Webhook:", err);
+    return res.status(500).json({ error: "Database update failed" });
+  }
 }

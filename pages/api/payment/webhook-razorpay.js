@@ -1,8 +1,10 @@
 import crypto from "crypto";
 import { getSubscriptionByOrderId, createSubscription } from "../../../app/model/subscription-db";
 import { getPlanById } from "../../../app/model/plan-db";
+import { updateUserPlan } from "../../../app/model/user-db"; 
+import { docClient } from "../../../app/model/dynamodb"; 
+import { UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb"; 
 
-// ✅ CRITICAL: Just like Stripe, Razorpay requires the raw body string to perfectly verify the cryptographic signature.
 export const config = {
   api: { bodyParser: false },
 };
@@ -24,11 +26,9 @@ export default async function handler(req, res) {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      console.error("Missing RAZORPAY_WEBHOOK_SECRET in environment variables");
       return res.status(500).json({ error: "Server Configuration Error" });
     }
 
-    // 1. Verify the signature securely
     const expectedSignature = crypto
       .createHmac("sha256", webhookSecret)
       .update(rawBody.toString())
@@ -36,29 +36,38 @@ export default async function handler(req, res) {
 
     if (expectedSignature !== signature) {
       console.error("⚠️ Razorpay Webhook Signature Verification Failed");
-      return res.status(400).send("Invalid Signature");
+      return res.status(400).send("Invalid signature");
     }
 
-    // Parse the verified body
     const event = JSON.parse(rawBody.toString());
 
-    // 2. Listen specifically for successful recurring subscription payments
+    // ==========================================
+    // 1. HANDLE AUTO-RENEWALS & DUPLICATES
+    // ==========================================
     if (event.event === "subscription.charged") {
-      const subscriptionEntity = event.payload.subscription.entity;
-      const paymentEntity = event.payload.payment.entity;
+      const paymentId = event.payload.payment.entity.id;
+      const subscriptionId = event.payload.subscription.entity.id;
+      const amountPaidInr = event.payload.payment.entity.amount / 100;
 
-      const subscriptionId = subscriptionEntity.id; // e.g., sub_12345
-      const paymentId = paymentEntity.id; // e.g., pay_12345
-      const amountPaidInr = paymentEntity.amount / 100; // Razorpay amounts are in paise
+      // Prevent Duplicate Records
+      const { Item: existingPayment } = await docClient.send(new GetCommand({
+        TableName: "Subscriptions",
+        Key: { payment_id: paymentId }
+      }));
 
-      // Find the original subscription in our database
+      if (existingPayment) {
+        console.log("⏭️ Skipping Razorpay subscription.charged because payment was already verified by frontend.");
+        return res.status(200).json({ status: "ok" });
+      }
+
       const originalSub = await getSubscriptionByOrderId(subscriptionId);
-      
+
       if (originalSub) {
         const plan = await getPlanById(originalSub.plan_id);
-        
         if (plan) {
-          const durationDays = originalSub.billing_cycle === 'yearly' ? 365 : (plan.duration || 30);
+          // ✅ FIX 1: Dynamically determine duration based on billing cycle!
+          const isYearly = originalSub.billing_cycle === "yearly";
+          const durationDays = isYearly ? 365 : 30;
           const graceDays = plan.grace_period || 7;
           
           const expireDate = new Date();
@@ -67,32 +76,58 @@ export default async function handler(req, res) {
           const graceExpireDate = new Date(expireDate);
           graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
 
-          // Create a NEW row in the database for this month's receipt!
+          // ✅ FIX 2: Safely extract old snapshot features
+          const safeSystemFeatures = originalSub.snapshot_system_features || originalSub.snapshot_features || {};
+          const safeDisplayFeatures = originalSub.snapshot_display_features || [];
+
           await createSubscription({
             paymentId: paymentId,
-            orderId: subscriptionId, // Keeps the same recurring ID
+            orderId: subscriptionId, 
             userId: originalSub.user_id,
             planId: originalSub.plan_id,
             amount: amountPaidInr,
             currency: "INR",
-            gateway: "Razorpay Auto-Renewal", // Differentiate from manual checkout
+            gateway: "Razorpay Auto-Renewal", 
             billing_cycle: originalSub.billing_cycle,
             expireDate: expireDate.toISOString(),
             graceExpireDate: graceExpireDate.toISOString(),
-            system_features: originalSub.snapshot_system_features,
-            display_features: originalSub.snapshot_display_features
+            system_features: safeSystemFeatures,
+            display_features: safeDisplayFeatures
           });
           
-          console.log(`✅ Successfully auto-renewed Razorpay subscription for User: ${originalSub.user_id}`);
+          // Update the user plan dynamically
+          await updateUserPlan(originalSub.user_id, originalSub.plan_id);
+
+          console.log(`✅ Auto-renewed Razorpay subscription for User: ${originalSub.user_id} (${originalSub.billing_cycle})`);
         }
       }
     }
 
-    // Return 200 OK so Razorpay knows we received it
+    // ==========================================
+    // 2. HANDLE CANCELLATIONS 
+    // ==========================================
+    if (event.event === "subscription.cancelled") {
+      const subscriptionId = event.payload.subscription.entity.id;
+      const dbSub = await getSubscriptionByOrderId(subscriptionId);
+
+      if (dbSub) {
+        await docClient.send(new UpdateCommand({
+          TableName: "Subscriptions",
+          Key: { payment_id: dbSub.payment_id },
+          UpdateExpression: "set #st = :exp",
+          ExpressionAttributeNames: { "#st": "status" },
+          ExpressionAttributeValues: { ":exp": "Expired" }
+        }));
+
+        await updateUserPlan(dbSub.user_id, "none");
+        console.log(`🚫 Cancelled Razorpay subscription for User: ${dbSub.user_id}`);
+      }
+    }
+
     return res.status(200).json({ status: "ok" });
 
   } catch (error) {
     console.error("Razorpay Webhook Error:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error: "Database update failed" });
   }
 }
