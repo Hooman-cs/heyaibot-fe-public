@@ -83,18 +83,22 @@
 }
 
 .saveButton {
-  padding: 14px;
+
   background: linear-gradient(135deg, #2563eb, #3b82f6);
+   padding: 12px 24px;
+
   color: white;
   border: none;
-  border-radius: 14px;
-  font-size: 15px;
+  border-radius: 40px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
-  letter-spacing: 0.5px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+box-shadow: 0 8px 20px rgba(37, 99, 235, 0.1);
+  white-space: nowrap;
 }
 
 .saveButton:hover:not(:disabled) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './AuthorForm.module.css';
 import BasicInfo from '../Steps/BasicInfo';
 import KnowledgeBase from '../Steps/KnowledgeBase';
@@ -21,46 +21,43 @@ const WebsiteConfig = ({
   backendApiKey,
   saving
 }) => {
-  const [activeStep, setActiveStep] = useState(1);
-  const [basicInfoValid, setBasicInfoValid] = useState(false);
+  const [activeStep, setActiveStep]           = useState(1);
+  const [basicInfoValid, setBasicInfoValid]   = useState(false);
   const [showBasicInfoError, setShowBasicInfoError] = useState(false);
-  const sidebarRef = useRef(null);
-  const contentRef = useRef(null);
+  const sidebarRef  = useRef(null);
+  const contentRef  = useRef(null);
   const basicInfoRef = useRef(null);
 
   const steps = [
-    { id: 1, name: 'Basic Info', icon: '📄' },
+    { id: 1, name: 'Basic Info',     icon: '📄' },
     { id: 2, name: 'Knowledge Base', icon: '📚' },
-    { id: 3, name: 'Prompts', icon: '💬' },
-    { id: 4, name: 'Actions', icon: '⚡' },
+    { id: 3, name: 'Prompts',        icon: '💬' },
+    { id: 4, name: 'Actions',        icon: '⚡' },
     { id: 5, name: 'Preview & Test', icon: '👁️' },
-    { id: 6, name: 'Branding', icon: '🎨' }
+    { id: 6, name: 'Branding',       icon: '🎨' },
   ];
 
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activeStep]);
 
-  // ✅ Check BasicInfo validity whenever config changes
   useEffect(() => {
-    const isValid = BasicInfo.validate(config);
+    const isValid = !!(
+      config.websiteName?.trim() &&
+      config.websiteUrl?.trim() &&
+      config.category?.length > 0
+    );
     setBasicInfoValid(isValid);
-  }, [config]);
+  }, [config.websiteName, config.websiteUrl, config.category]);
 
-  // ✅ Save button click — validate before saving
   const handleSaveClick = (e) => {
     e.preventDefault();
-
     if (!basicInfoValid) {
-      // Step 1 pe redirect karo
       setActiveStep(1);
-      setShowBasicInfoError(true);  // BasicInfo ko errors dikhao
-
-      // Scroll top
+      setShowBasicInfoError(true);
       if (contentRef.current) contentRef.current.scrollTop = 0;
       return;
     }
-
     setShowBasicInfoError(false);
     onSubmit(e);
   };
@@ -73,14 +70,13 @@ const WebsiteConfig = ({
       tempCategory, setTempCategory,
       websiteId, apiKey, backendApiKey
     };
-
     switch (activeStep) {
       case 1:
         return (
           <BasicInfo
             {...commonProps}
             ref={basicInfoRef}
-            showErrors={showBasicInfoError}      // ✅ errors trigger
+            showErrors={showBasicInfoError}
             onValidationChange={setBasicInfoValid}
           />
         );
@@ -95,21 +91,11 @@ const WebsiteConfig = ({
 
   return (
     <div className={styles.configContainer}>
-      {/* Left Sidebar */}
+
+      {/* ── Left Sidebar — Back to List REMOVED ── */}
       <div className={styles.sidebar} ref={sidebarRef}>
         <div className={styles.sidebarHeader}>
-          <div className={styles.backLink} onClick={onCancel}>
-            ← Back to List
-          </div>
-          <button
-            className={styles.saveButton}
-            onClick={handleSaveClick}   // ✅ validation wala handler
-            disabled={saving}
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-
-          {/* ✅ Basic info incomplete warning */}
+          {/* ✅ Sirf warning — back button nahi */}
           {!basicInfoValid && (
             <div className={styles.saveWarning}>
               ⚠️ Fill Basic Info first
@@ -131,12 +117,13 @@ const WebsiteConfig = ({
               <div className={styles.stepIcon}>{step.icon}</div>
               <div className={styles.stepInfo}>
                 <span className={styles.stepName}>{step.name}</span>
-                {/* ✅ Red dot on step 1 if incomplete */}
                 {step.id === 1 && !basicInfoValid && (
                   <span className={styles.stepErrorDot}>!</span>
                 )}
               </div>
-              {activeStep === step.id && <div className={styles.activeIndicator}></div>}
+              {activeStep === step.id && (
+                <div className={styles.activeIndicator}></div>
+              )}
             </div>
           ))}
         </div>
@@ -144,7 +131,7 @@ const WebsiteConfig = ({
 
       <div className={styles.verticalDivider}></div>
 
-      {/* Right Content Area */}
+      {/* ── Right Content Area ── */}
       <div className={styles.contentArea}>
         <div className={styles.contentHeader}>
           <div className={styles.headerLeft}>
@@ -153,7 +140,24 @@ const WebsiteConfig = ({
               Step {activeStep} of {steps.length}
             </div>
           </div>
+
+          {/* ✅ Save + Next — side by side, same style */}
           <div className={styles.headerButtons}>
+            <button
+              className={styles.saveButton}
+              onClick={handleSaveClick}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <span className={styles.savingSpinner}></span>
+                  Saving...
+                </>
+              ) : (
+                <>💾 Save Changes</>
+              )}
+            </button>
+
             <button
               className={styles.nextButton}
               onClick={() => setActiveStep(prev => Math.min(steps.length, prev + 1))}
@@ -163,6 +167,7 @@ const WebsiteConfig = ({
               <span className={styles.buttonIcon}>→</span>
             </button>
           </div>
+
           <div className={styles.headerBottomLine}></div>
         </div>
 
@@ -172,6 +177,7 @@ const WebsiteConfig = ({
           </div>
         </div>
       </div>
+
     </div>
   );
 };

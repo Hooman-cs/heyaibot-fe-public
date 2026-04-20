@@ -106,20 +106,32 @@ export default async function handler(req, res) {
     // ==========================================
     // 2. HANDLE CANCELLATIONS 
     // ==========================================
+    // if (event.event === "subscription.cancelled") {
+    //   const subscriptionId = event.payload.subscription.entity.id;
+    //   const dbSub = await getSubscriptionByOrderId(subscriptionId);
+
+    //   if (dbSub) {
+    //     await docClient.send(new UpdateCommand({
+    //       TableName: "Subscriptions",
+    //       Key: { payment_id: dbSub.payment_id },
+    //       UpdateExpression: "set #st = :exp",
+    //       ExpressionAttributeNames: { "#st": "status" },
+    //       ExpressionAttributeValues: { ":exp": "Expired" }
+    //     }));
+
+    //     await updateUserPlan(dbSub.user_id, "none");
+    //     console.log(`🚫 Cancelled Razorpay subscription for User: ${dbSub.user_id}`);
+    //   }
+    // }
     if (event.event === "subscription.cancelled") {
       const subscriptionId = event.payload.subscription.entity.id;
       const dbSub = await getSubscriptionByOrderId(subscriptionId);
 
       if (dbSub) {
-        await docClient.send(new UpdateCommand({
-          TableName: "Subscriptions",
-          Key: { payment_id: dbSub.payment_id },
-          UpdateExpression: "set #st = :exp",
-          ExpressionAttributeNames: { "#st": "status" },
-          ExpressionAttributeValues: { ":exp": "Expired" }
-        }));
-
-        await updateUserPlan(dbSub.user_id, "none");
+        // OPTIMIZATION: Use the new shared utility
+        const { markSubscriptionExpired } = await import('../../../app/model/subscription-db');
+        await markSubscriptionExpired(dbSub.payment_id, dbSub.user_id);
+        
         console.log(`🚫 Cancelled Razorpay subscription for User: ${dbSub.user_id}`);
       }
     }

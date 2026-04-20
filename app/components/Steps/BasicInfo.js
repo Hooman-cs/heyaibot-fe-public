@@ -236,7 +236,7 @@ const BasicInfo = ({ config, setConfig, onValidationChange }) => {
                   </div>
                   <div className={styles.editActions}>
                     <button onClick={handleSave} className={`${styles.actionBtn} ${styles.saveBtn}`} disabled={!editValue.trim()}>
-                      <FaSave className={styles.btnIcon} /><span>Save</span>
+                      <FaSave className={styles.btnIcon} /><span>Add</span>
                     </button>
                     <button onClick={handleCancel} className={`${styles.actionBtn} ${styles.cancelBtn}`}>
                       <FaUndo className={styles.btnIcon} /><span>Cancel</span>
@@ -340,7 +340,7 @@ const BasicInfo = ({ config, setConfig, onValidationChange }) => {
                   </div>
                   <div className={styles.editActions}>
                     <button onClick={handleSave} className={`${styles.actionBtn} ${styles.saveBtn}`} disabled={!editValue.trim()}>
-                      <FaSave className={styles.btnIcon} /><span>Save</span>
+                      <FaSave className={styles.btnIcon} /><span>Add</span>
                     </button>
                     <button onClick={handleCancel} className={`${styles.actionBtn} ${styles.cancelBtn}`}>
                       <FaUndo className={styles.btnIcon} /><span>Cancel</span>

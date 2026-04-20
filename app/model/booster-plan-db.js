@@ -31,7 +31,8 @@ export async function createBoosterPlan(data) {
     booster_id: boosterId,
     name: data.name || "Token Booster",
     token_amount: isNaN(Number(data.token_amount)) ? 0 : Number(data.token_amount),
-    amount: isNaN(Number(data.amount)) ? 0 : Number(data.amount), // INR
+    // amount: isNaN(Number(data.amount)) ? 0 : Number(data.amount), // INR
+    amount: isNaN(Number(data.amount_inr || data.amount)) ? 0 : Number(data.amount_inr || data.amount),
     amount_usd: isNaN(Number(data.amount_usd)) ? 0 : Number(data.amount_usd), // USD
     status: "active"
   };
@@ -52,7 +53,8 @@ export async function updateBoosterPlan(boosterId, data) {
       ExpressionAttributeValues: {
         ":n": data.name,
         ":ta": Number(data.token_amount) || 0,
-        ":a": Number(data.amount) || 0,
+        // ":a": Number(data.amount) || 0,
+        ":a": Number(data.amount_inr || data.amount) || 0,
         ":u": Number(data.amount_usd) || 0,
       },
       ReturnValues: "UPDATED_NEW"

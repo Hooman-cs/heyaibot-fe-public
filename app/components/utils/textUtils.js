@@ -13,10 +13,10 @@ export const makeFriendly = (text) => {
     return 'Could you please provide some information?';
   }
   const friendlyPrompts = [
-    `Please tell me ${text}`,
-    `I'd love to know ${text}!`,
-    `Let me know ${text}`,
-    `Could you provide ${text}?`,
+    `${text}`,
+    `${text}!`,
+    `${text}`,
+    `${text}?`,
   ];
   return friendlyPrompts[Math.floor(Math.random() * friendlyPrompts.length)];
 };

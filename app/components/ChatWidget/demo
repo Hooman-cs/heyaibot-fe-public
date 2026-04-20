@@ -21,94 +21,104 @@ import { executeUrls, saveChatRequest, saveEmailRequest, saveConversationToDatab
 import { transformDataWithParams, createClientSummary, createServerSummary, findSummaryParamKey } from '../utils/transformUtils';
 import { v4 as uuidv4 } from 'uuid';
 
+const TOKEN_LIMIT_MESSAGE = 'Token limit reached. Please upgrade your token plan.';
+
 const ChatWidget = ({
-  primaryColor    = '#4a6baf',
-  secondaryColor  = 'tomato',
-  widgetPosition  = { right: '0px', bottom: '0px' },
-  chatWindowSize  = { width: '340px', height: '470px' },
-  backendApiKey   = config.backendApiKey,
-  apiBaseUrl      = config.apiBaseUrl,
+  primaryColor   = '#4a6baf',
+  secondaryColor = 'tomato',
+  widgetPosition = { right: '0px', bottom: '0px' },
+  chatWindowSize = { width: '340px', height: '470px' },
+  backendApiKey  = config.backendApiKey,
+  apiBaseUrl     = config.apiBaseUrl,
 }) => {
-  const [isChatOpen, setIsChatOpen]                       = useState(true);
-  const [messages, setMessages]                           = useState([]);
-  const [inputMessage, setInputMessage]                   = useState('');
-  const [isLoading, setIsLoading]                         = useState(false);
-  const [storedSummaryList, setStoredSummaryList]         = useState([]);
-  const [systemPrompts, setSystemPrompts]                 = useState([]);
-  const [welcomeMessages, setWelcomeMessages]             = useState([]);
-  const [websiteTitle, setWebsiteTitle]                   = useState('Support');
-  const [pendingQuestions, setPendingQuestions]           = useState([]);
-  const [isConfirming, setIsConfirming]                   = useState(false);
-  const [connectionStatus, setConnectionStatus]           = useState('connecting');
-  const [activeConfig, setActiveConfig]                   = useState(null);
-  const [categories, setCategories]                       = useState([]);
-  const [currentPromptFlow, setCurrentPromptFlow]         = useState(null);
-  const [collectedData, setCollectedData]                 = useState({});
-  const [transformedDataForAPI, setTransformedDataForAPI] = useState({});
-  const [suggestedPrompts, setSuggestedPrompts]           = useState([]);
-  const [currentChildOptions, setCurrentChildOptions]     = useState([]);
-  const [isWebsiteActive, setIsWebsiteActive]             = useState(false);
-  const [websiteStatus, setWebsiteStatus]                 = useState('checking');
-  const [storedUrls, setStoredUrls]                       = useState([]);
-  const [storedApiKeys, setStoredApiKeys]                 = useState([]);
+  const [isChatOpen, setIsChatOpen]                           = useState(true);
+  const [messages, setMessages]                               = useState([]);
+  const [inputMessage, setInputMessage]                       = useState('');
+  const [isLoading, setIsLoading]                             = useState(false);
+  // isTyping — jab tak latest bot message word-by-word chal raha hai
+  const [isTyping, setIsTyping]                               = useState(false);
+  const [storedSummaryList, setStoredSummaryList]             = useState([]);
+  const [systemPrompts, setSystemPrompts]                     = useState([]);
+  const [welcomeMessages, setWelcomeMessages]                 = useState([]);
+  const [websiteTitle, setWebsiteTitle]                       = useState('Support');
+  const [pendingQuestions, setPendingQuestions]               = useState([]);
+  const [isConfirming, setIsConfirming]                       = useState(false);
+  const [connectionStatus, setConnectionStatus]               = useState('connecting');
+  const [activeConfig, setActiveConfig]                       = useState(null);
+  const [categories, setCategories]                           = useState([]);
+  const [currentPromptFlow, setCurrentPromptFlow]             = useState(null);
+  const [collectedData, setCollectedData]                     = useState({});
+  const [transformedDataForAPI, setTransformedDataForAPI]     = useState({});
+  const [allCustomPrompts, setAllCustomPrompts]               = useState([]);
+  const [suggestedPrompts, setSuggestedPrompts]               = useState([]);
+  const [currentChildOptions, setCurrentChildOptions]         = useState([]);
+  const [isWebsiteActive, setIsWebsiteActive]                 = useState(false);
+  const [websiteStatus, setWebsiteStatus]                     = useState('checking');
+  const [storedUrls, setStoredUrls]                           = useState([]);
+  const [storedApiKeys, setStoredApiKeys]                     = useState([]);
   const [storedPromptsWithParams, setStoredPromptsWithParams] = useState([]);
-  const [messageAnimations, setMessageAnimations]         = useState({});
-  const [selectedPromptName, setSelectedPromptName]       = useState('');
-  const [parentWebsiteUrl, setParentWebsiteUrl]           = useState('');
-  const [interestDetectionEnabled]                        = useState(true);
-  const [recentTopics, setRecentTopics]                   = useState([]);
-  const [autoClickInProgress, setAutoClickInProgress]     = useState(false);
-  const [lastAIMessage, setLastAIMessage]                 = useState('');
+  const [messageAnimations, setMessageAnimations]             = useState({});
+  const [selectedPromptName, setSelectedPromptName]           = useState('');
+  const [parentWebsiteUrl, setParentWebsiteUrl]               = useState('');
+  const [interestDetectionEnabled]                            = useState(true);
+  const [recentTopics, setRecentTopics]                       = useState([]);
+  const [autoClickInProgress, setAutoClickInProgress]         = useState(false);
+  const [lastAIMessage, setLastAIMessage]                     = useState('');
   const [deviceInfo, setDeviceInfo] = useState({
     isMobile: false, isTablet: false, isSmallScreen: false,
     screenWidth: 1024, deviceType: 'desktop'
   });
-  const [isFullScreen, setIsFullScreen]                   = useState(false);
-  const [isInitialized, setIsInitialized]                 = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible]         = useState(false);
-  const [keyboardHeight, setKeyboardHeight]               = useState(0);
+  const [isFullScreen, setIsFullScreen]                       = useState(false);
+  const [isInitialized, setIsInitialized]                     = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible]             = useState(false);
+  const [keyboardHeight, setKeyboardHeight]                   = useState(0);
   const [safeAreaInsets, setSafeAreaInsets] = useState({
     top: '0px', bottom: '0px', left: '0px', right: '0px'
   });
-  const [sessionId, setSessionId]   = useState('');
-  const [autoSaveEnabled]           = useState(true);
-  const [lastActivity, setLastActivity]     = useState(Date.now());
-  const [sessionStartTime, setSessionStartTime] = useState(Date.now());
+  const [sessionId, setSessionId]                 = useState('');
+  const [autoSaveEnabled]                         = useState(true);
+  const [lastActivity, setLastActivity]           = useState(Date.now());
+  const [sessionStartTime, setSessionStartTime]   = useState(Date.now());
   const [conversationCount, setConversationCount] = useState(0);
-  const [responsiveStyles, setResponsiveStyles] = useState({
+  const [responsiveStyles, setResponsiveStyles]   = useState({
     container: {},
     window: {
       width: chatWindowSize.width, height: chatWindowSize.height,
       position: 'fixed', right: widgetPosition.right, bottom: widgetPosition.bottom
     }
   });
-  const [isSaving, setIsSaving]             = useState(false);
-  const [hasInitialSave, setHasInitialSave] = useState(false);
-  const [isMounted, setIsMounted]           = useState(false);
-  const [headerColor, setHeaderColor]       = useState(null);
-  const [poweredByText, setPoweredByText]   = useState('JDPC Global');
-  const [poweredByUrl, setPoweredByUrl]     = useState('https://jdpcglobal.com');
+  const [isSaving, setIsSaving]                   = useState(false);
+  const [chatEnabled, setChatEnabled]             = useState(true);
+  const [tokenLimitReached, setTokenLimitReached] = useState(false);
+  const [hasInitialSave, setHasInitialSave]       = useState(false);
+  const [isMounted, setIsMounted]                 = useState(false);
+  const [headerColor, setHeaderColor]             = useState(null);
+  const [poweredByText, setPoweredByText]         = useState('JDPC Global');
+  const [poweredByUrl, setPoweredByUrl]           = useState('https://jdpcglobal.com');
+  const [tokenDetails, setTokenDetails]           = useState(null);
+  const [tokenUserId, setTokenUserId]             = useState(null);
 
-  // ─── Refs ──────────────────────────────────────────────────────
-  const chatBodyRef         = useRef(null);
-  const chatInputRef        = useRef(null);
-  const messagesEndRef      = useRef(null);
-  const headerRef           = useRef(null);
-  const inputWrapperRef     = useRef(null);
-  const lastMessageCount    = useRef(0);
-  const saveTimeoutRef      = useRef(null);
-  const lastSavedMessageRef = useRef(null);
-  const hasShownWelcome     = useRef(false);
-  const welcomeShownRef     = useRef(false);
-  const activeConfigRef     = useRef(null);
-  const threadResetRef      = useRef(false);
+  const userHasMessagedRef  = useRef(false);
+  const TOKENDETAILS_API_URL = '/api/user/token-details';
+  const chatBodyRef          = useRef(null);
+  const chatInputRef         = useRef(null);
+  const messagesEndRef       = useRef(null);
+  const headerRef            = useRef(null);
+  const inputWrapperRef      = useRef(null);
+  const lastMessageCount     = useRef(0);
+  const saveTimeoutRef       = useRef(null);
+  const lastSavedMessageRef  = useRef(null);
+  const hasShownWelcome      = useRef(false);
+  const welcomeShownRef      = useRef(false);
+  const activeConfigRef      = useRef(null);
+  const threadResetRef       = useRef(false);
+  const tokenLimitShownRef   = useRef(false);
+  // pending suggestions — typing complete hone ke baad set hongi
+  const pendingSuggestionsRef = useRef([]);
 
-  // ─── Mount ─────────────────────────────────────────────────────
   useEffect(() => { setIsMounted(true); }, []);
-
   useEffect(() => { activeConfigRef.current = activeConfig; }, [activeConfig]);
 
-  // ─── Responsive styles ─────────────────────────────────────────
   useEffect(() => {
     if (typeof window !== 'undefined' && isMounted) {
       const s = getResponsiveStyles(
@@ -120,7 +130,6 @@ const ChatWidget = ({
   }, [isInitialized, isFullScreen, widgetPosition, chatWindowSize,
       isKeyboardVisible, keyboardHeight, safeAreaInsets, isMounted]);
 
-  // ─── Branding ──────────────────────────────────────────────────
   useEffect(() => {
     const fetchBrandingData = async () => {
       if (!backendApiKey || !apiBaseUrl) return;
@@ -135,60 +144,78 @@ const ChatWidget = ({
           if (data.data.poweredByText) setPoweredByText(data.data.poweredByText);
           if (data.data.poweredByUrl)  setPoweredByUrl(data.data.poweredByUrl);
         }
-      } catch (err) { console.error('❌ Branding error:', err); }
+      } catch (err) { console.error('Branding error:', err); }
     };
     fetchBrandingData();
   }, [apiBaseUrl, backendApiKey]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // ✅ DEFINITIVE RELOAD DETECTION
-  //
-  // Strategy: ONE reliable flag — 'chat_user_messaged'
-  //   - Set to 'true' ONLY inside saveSingleMessage after a user message
-  //     is successfully saved to the DB (not from React state)
-  //   - On every page load: if sessionId exists AND this flag is 'true' → RELOAD
-  //   - After detecting reload: set force_new_thread flag, clear chat_user_messaged
-  //     so next first message in new session won't falsely trigger reload again
-  //
-  // This is reliable because:
-  //   - React state resets on reload (unreliable)
-  //   - performance.getEntriesByType unreliable in Next.js (unreliable)
-  //   - localStorage persists across reloads (reliable ✅)
-  //   - Flag is set from DB save callback not React render (reliable ✅)
-  // ─────────────────────────────────────────────────────────────────
+  const applyTokenLimit = () => {
+    setIsLoading(false);
+    setIsTyping(false);
+    setAutoClickInProgress(false);
+    setCurrentPromptFlow(null);
+    setIsConfirming(false);
+    setCurrentChildOptions([]);
+    setChatEnabled(false);
+    setTokenLimitReached(true);
+    setSuggestedPrompts([]);
+    if (!tokenLimitShownRef.current) {
+      tokenLimitShownRef.current = true;
+      setMessages([{
+        id: uuidv4(), sender: 'support-bot',
+        message: TOKEN_LIMIT_MESSAGE,
+        createdAt: new Date().toISOString(),
+        isAdmin: true, isError: true, _isTokenError: true,
+      }]);
+    }
+  };
+
+  const fetchAndSetTokenDetails = async (userId) => {
+    if (!userId) return;
+    try {
+      const r1 = await fetch(`${TOKENDETAILS_API_URL}?userId=${userId}`);
+      const d1 = await r1.json();
+      if (!d1.success) return;
+      const r2 = await fetch(`${apiBaseUrl}/api/get-token-details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(d1.data),
+      });
+      const d2 = await r2.json();
+      if (d2.message === 'All token use' || d2.usertotalTokenPercentage === '100.0%') {
+        applyTokenLimit(); return;
+      }
+      if (tokenLimitReached) {
+        setChatEnabled(true);
+        setTokenLimitReached(false);
+        tokenLimitShownRef.current = false;
+      }
+    } catch (err) { console.error('Token check error:', err); }
+  };
+
+  useEffect(() => {
+    if (!tokenUserId) return;
+    fetchAndSetTokenDetails(tokenUserId);
+    const interval = setInterval(() => fetchAndSetTokenDetails(tokenUserId), 8000);
+    return () => clearInterval(interval);
+  }, [tokenUserId, apiBaseUrl]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    const storedSessionId   = localStorage.getItem('chat_session_id');
-    // ✅ THE ONE RELIABLE FLAG — set by saveSingleMessage on successful user msg save
-    const userHadMessaged   = localStorage.getItem('chat_user_messaged') === 'true';
-    const storedCount       = parseInt(localStorage.getItem('conversation_count') || '0');
-
-    const isReload = !!(storedSessionId && userHadMessaged);
-
-  
+    const storedSessionId = localStorage.getItem('chat_session_id');
+    const userHadMessaged = localStorage.getItem('chat_user_messaged') === 'true';
+    const storedCount     = parseInt(localStorage.getItem('conversation_count') || '0');
+    const isReload        = !!(storedSessionId && userHadMessaged);
 
     if (isReload) {
-      // ────── RELOAD PATH ──────
-    
-
       setSessionId(storedSessionId);
-
       const newCount = storedCount + 1;
       setConversationCount(newCount);
       localStorage.setItem('conversation_count', newCount.toString());
-
-      // ✅ Set force_new_thread (PRIMARY: localStorage, BACKUP: ref)
       localStorage.setItem('force_new_thread', 'true');
-      threadResetRef.current = true;
-
-      // ✅ Clear the messaged flag — so NEXT session doesn't falsely detect reload
-      // Will be re-set when user sends first message in this new session
+      threadResetRef.current     = true;
+      tokenLimitShownRef.current = false;
       localStorage.removeItem('chat_user_messaged');
-
-    
-
-      // Reset UI state
       setMessages([]);
       setCurrentPromptFlow(null);
       setCollectedData({});
@@ -198,18 +225,13 @@ const ChatWidget = ({
       lastSavedMessageRef.current = null;
       hasShownWelcome.current     = false;
       welcomeShownRef.current     = false;
-
+      userHasMessagedRef.current  = false;
     } else if (storedSessionId) {
-      // ────── EXISTING SESSION, FIRST LOAD ──────
-    
       setSessionId(storedSessionId);
       setConversationCount(storedCount);
-      // Don't set force_new_thread — continue same thread
       localStorage.removeItem('force_new_thread');
       threadResetRef.current = false;
-
     } else {
-      // ────── BRAND NEW SESSION ──────
       const newSessionId = uuidv4();
       localStorage.setItem('chat_session_id', newSessionId);
       setSessionId(newSessionId);
@@ -219,50 +241,42 @@ const ChatWidget = ({
       localStorage.removeItem('chat_user_messaged');
       setConversationCount(0);
       threadResetRef.current = false;
-     
     }
 
-    const activityHandler = () => setLastActivity(Date.now());
-    window.addEventListener('click',     activityHandler);
-    window.addEventListener('keypress',  activityHandler);
-    window.addEventListener('scroll',    activityHandler);
-    window.addEventListener('mousemove', activityHandler);
+    const act = () => setLastActivity(Date.now());
+    window.addEventListener('click', act);
+    window.addEventListener('keypress', act);
+    window.addEventListener('scroll', act);
+    window.addEventListener('mousemove', act);
     return () => {
-      window.removeEventListener('click',     activityHandler);
-      window.removeEventListener('keypress',  activityHandler);
-      window.removeEventListener('scroll',    activityHandler);
-      window.removeEventListener('mousemove', activityHandler);
+      window.removeEventListener('click', act);
+      window.removeEventListener('keypress', act);
+      window.removeEventListener('scroll', act);
+      window.removeEventListener('mousemove', act);
     };
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────
-  // ✅ Long inactivity (30 min) → next message new thread
-  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const LONG_TIME_THRESHOLD = 30 * 60 * 1000;
     const CHECK_INTERVAL      = 60000;
-
     const checkLongTimePassed = () => {
       const now = Date.now();
       if ((now - lastActivity) > LONG_TIME_THRESHOLD) {
-      
         const newCount = conversationCount + 1;
         setConversationCount(newCount);
         localStorage.setItem('conversation_count', newCount.toString());
         localStorage.setItem('force_new_thread', 'true');
         threadResetRef.current = true;
-        // Also clear messaged flag so it behaves like a fresh session
         localStorage.removeItem('chat_user_messaged');
         setSessionStartTime(now);
         setLastActivity(now);
+        userHasMessagedRef.current = false;
       }
     };
-
     const interval = setInterval(checkLongTimePassed, CHECK_INTERVAL);
     return () => clearInterval(interval);
   }, [lastActivity, conversationCount]);
 
-  // ─── PostMessage communication ──────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setupParentCommunication({
@@ -282,7 +296,10 @@ const ChatWidget = ({
         if (event.data.isOpen) setTimeout(() => forceScrollToBottom(), 100);
       }
       if (event.data?.type === 'safeArea') {
-        setSafeAreaInsets({ top: event.data.top, bottom: event.data.bottom, left: event.data.left, right: event.data.right });
+        setSafeAreaInsets({
+          top: event.data.top, bottom: event.data.bottom,
+          left: event.data.left, right: event.data.right
+        });
       }
     };
     window.addEventListener('message', handleMessage);
@@ -302,7 +319,9 @@ const ChatWidget = ({
   }, []);
 
   const forceScrollToBottom = () => {
-    if (chatBodyRef.current) chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -314,12 +333,12 @@ const ChatWidget = ({
     if (isKeyboardVisible) setTimeout(() => forceScrollToBottom(), 300);
   }, [isKeyboardVisible]);
 
-  // ─── Auto-save ─────────────────────────────────────────────────
+  /* ── Auto-save ─────────────────────────────────────────── */
   useEffect(() => {
     if (!autoSaveEnabled || messages.length === 0 || !sessionId || !activeConfig?.id || isSaving) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
-      const lastMsg        = messages[messages.length - 1];
+      const lastMsg = messages[messages.length - 1];
       const isNaturalPause = lastMsg && (
         lastMsg.message.includes('confirm') || lastMsg.message.includes('done') ||
         lastMsg.message.includes('thank you') || lastMsg.sender === 'user'
@@ -332,7 +351,6 @@ const ChatWidget = ({
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [messages, sessionId, activeConfig, autoSaveEnabled, isSaving, hasInitialSave]);
 
-  // ─── saveCurrentConversation ────────────────────────────────────
   const saveCurrentConversation = async () => {
     if (!sessionId || !activeConfig?.id || messages.length === 0 || isSaving) return;
     try {
@@ -347,10 +365,15 @@ const ChatWidget = ({
       let   currentThread = null;
       newMessages.forEach((msg) => {
         if (msg.sender === 'user') {
-          currentThread = { userMessage: { text: msg.message, tokens: Math.ceil(msg.message.length / 4) }, botReplies: [] };
+          currentThread = {
+            userMessage: { text: msg.message, tokens: Math.ceil(msg.message.length / 4) },
+            botReplies: []
+          };
           threads.push(currentThread);
         } else if (msg.sender === 'support-bot' && currentThread && !msg._isTemp) {
-          currentThread.botReplies.push({ text: msg.message, tokens: Math.ceil(msg.message.length / 4) });
+          currentThread.botReplies.push({
+            text: msg.message, tokens: Math.ceil(msg.message.length / 4)
+          });
         }
       });
       if (threads.length === 0) { setIsSaving(false); return; }
@@ -369,30 +392,22 @@ const ChatWidget = ({
           localStorage.removeItem('force_new_thread');
         }
       }
-    } catch (err) { console.error('❌ Auto-save error:', err); }
+    } catch (err) { console.error('Auto-save error:', err); }
     finally { setIsSaving(false); }
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // ✅ FIXED saveSingleMessage
-  //    1. No activeConfig check — saves even before config loads
-  //    2. Sets 'chat_user_messaged' after first successful user msg save
-  //       → this is what enables reliable reload detection next time
-  //    3. localStorage PRIMARY for force_new_thread, ref BACKUP
-  // ─────────────────────────────────────────────────────────────────
   const saveSingleMessage = async (role, text, tokens = 0) => {
     if (!sessionId) return;
     if (text === 'Saving your request...') return;
 
-    // 3s duplicate guard
-    const messageKey    = `${role}_${text}_${sessionId}`;
+    const MAX_LEN  = 800;
+    const safeText = text.length > MAX_LEN ? text.substring(0, MAX_LEN) + '...' : text;
+
+    const messageKey    = `${role}_${safeText.substring(0, 50)}_${sessionId}`;
     const now           = Date.now();
     const lastSavedKey  = localStorage.getItem(`last_saved_key_${sessionId}`);
     const lastSavedTime = parseInt(localStorage.getItem(`last_saved_time_${sessionId}`) || '0');
-    if (lastSavedKey === messageKey && (now - lastSavedTime) < 3000) {
-     
-      return;
-    }
+    if (lastSavedKey === messageKey && (now - lastSavedTime) < 3000) return;
 
     try {
       const endpoint = role === 'user'
@@ -402,69 +417,62 @@ const ChatWidget = ({
       const forceFromStorage     = localStorage.getItem('force_new_thread') === 'true';
       const shouldForceNewThread = role === 'user' && (threadResetRef.current || forceFromStorage);
 
-     
-
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
-          tokens: tokens || Math.ceil(text.length / 4),
+          text:           safeText,
+          tokens:         tokens || Math.ceil(safeText.length / 4),
           forceNewThread: shouldForceNewThread
         })
       });
 
       const data = await response.json();
-
       if (response.ok) {
         localStorage.setItem(`last_saved_key_${sessionId}`, messageKey);
         localStorage.setItem(`last_saved_time_${sessionId}`, now.toString());
-
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg) lastSavedMessageRef.current = lastMsg.id;
-
-       
-        // ✅ KEY: Set 'chat_user_messaged' after first successful user save
-        //    This is the flag that enables reload detection on next page load
-        if (role === 'user') {
-          localStorage.setItem('chat_user_messaged', 'true');
-         
-        }
-
-        // ✅ Reset force flags after new thread confirmed
+        if (role === 'user') localStorage.setItem('chat_user_messaged', 'true');
         if (shouldForceNewThread && data.data?.isNewThread === true) {
           threadResetRef.current = false;
           localStorage.removeItem('force_new_thread');
-         
         }
-      } else {
-        console.error('❌ Save failed:', data);
       }
-
       return { success: response.ok, data };
     } catch (err) {
-      console.error('❌ Message save error:', err);
+      console.error('Message save error:', err);
       return { success: false, error: err.message };
     }
   };
 
-  // ─── Chat initialization ───────────────────────────────────────
+  /* ── Chat init ─────────────────────────────────────────── */
   const showServiceUnavailableMessage = (status) => {
     const message = getServiceUnavailableMessage(status);
-    setMessages([{ id: uuidv4(), sender: 'support-bot', message, createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+    setMessages([{
+      id: uuidv4(), sender: 'support-bot', message,
+      createdAt: new Date().toISOString(), isAdmin: true, isError: true
+    }]);
   };
 
-  const showWelcomeMessage = (backendWelcomeMessages, websiteData) => {
+  const showWelcomeMessage = (backendWelcomeMessages, websiteData, customPromptsArr) => {
+    if (tokenLimitShownRef.current) return;
     if (hasShownWelcome.current || welcomeShownRef.current) return;
+
     const welcomeMessage = generateWelcomeMessage(
       websiteData.websiteName || websiteTitle,
       backendWelcomeMessages,
       websiteData.systemPrompt || systemPrompts
     );
     const cleanedMessage = cleanText(welcomeMessage);
-    setMessages([{ id: uuidv4(), sender: 'support-bot', message: cleanedMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
+    setMessages([{
+      id: uuidv4(), sender: 'support-bot', message: cleanedMessage,
+      createdAt: new Date().toISOString(), isAdmin: true
+    }]);
     hasShownWelcome.current = true;
     welcomeShownRef.current = true;
+
+    if (customPromptsArr && customPromptsArr.length > 0) {
+      setSuggestedPrompts(customPromptsArr);
+    }
     setTimeout(() => saveSingleMessage('support-bot', cleanedMessage), 500);
   };
 
@@ -472,6 +480,7 @@ const ChatWidget = ({
     const initializeChat = async () => {
       const currentUrl     = getCurrentWebsiteUrl(parentWebsiteUrl);
       const databaseConfig = await getDatabaseUrlFromHeaderAPI(apiBaseUrl, backendApiKey);
+
       if (databaseConfig) {
         const wStatus = databaseConfig.status?.toLowerCase();
         if (wStatus !== 'active') {
@@ -481,21 +490,51 @@ const ChatWidget = ({
           hasShownWelcome.current = true; welcomeShownRef.current = true;
           return;
         }
+
         const isUrlMatch = checkUrlMatch(databaseConfig.websiteUrl, currentUrl);
         if (isUrlMatch) {
           setWebsiteStatus('active'); setIsWebsiteActive(true); setConnectionStatus('online');
           setWebsiteTitle(databaseConfig.websiteName || 'Support');
+
           const websiteData = await fetchWebsiteConfig(apiBaseUrl, backendApiKey, databaseConfig.websiteId);
           if (websiteData) {
             setActiveConfig(websiteData);
             setCategories(websiteData.category || []);
             setSystemPrompts(websiteData.systemPrompt || []);
-            if (websiteData.customPrompt?.length > 0) setSuggestedPrompts(websiteData.customPrompt);
-            const backendWelcomeMessages = await fetchWelcomeMessages(apiBaseUrl, backendApiKey, databaseConfig.websiteId);
+
+            const userId = websiteData.userId || websiteData.user_id || null;
+            if (userId) {
+              setTokenUserId(userId);
+              try {
+                const r1 = await fetch(`/api/user/token-details?userId=${userId}`);
+                const d1 = await r1.json();
+                if (d1.success) {
+                  const r2 = await fetch(`${apiBaseUrl}/api/get-token-details`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(d1.data),
+                  });
+                  const d2 = await r2.json();
+                  if (d2.message === 'All token use' || d2.usertotalTokenPercentage === '100.0%') {
+                    applyTokenLimit();
+                    hasShownWelcome.current = true;
+                    welcomeShownRef.current = true;
+                    return;
+                  }
+                }
+              } catch (e) { console.error('Initial token check error:', e); }
+            }
+
+            const customPromptsArr = (websiteData.customPrompt || []).filter(p => typeof p === 'string');
+            setAllCustomPrompts(customPromptsArr);
+
+            const backendWelcomeMessages = await fetchWelcomeMessages(
+              apiBaseUrl, backendApiKey, databaseConfig.websiteId
+            );
             setWelcomeMessages(backendWelcomeMessages);
-            showWelcomeMessage(backendWelcomeMessages, websiteData);
+            showWelcomeMessage(backendWelcomeMessages, websiteData, customPromptsArr);
           } else {
-            showWelcomeMessage([], databaseConfig);
+            showWelcomeMessage([], databaseConfig, []);
           }
         } else {
           setWebsiteStatus('url_mismatch'); setIsWebsiteActive(false); setConnectionStatus('offline');
@@ -512,6 +551,7 @@ const ChatWidget = ({
     initializeChat();
   }, [apiBaseUrl, backendApiKey, parentWebsiteUrl]);
 
+  /* ── Connection polling ─────────────────────────────────── */
   useEffect(() => {
     if (!isWebsiteActive || websiteStatus === 'inactive') return;
     const checkConnection = async () => {
@@ -521,13 +561,25 @@ const ChatWidget = ({
         if (result.success) {
           if (result.status !== 'active') {
             setIsWebsiteActive(false); setWebsiteStatus('inactive'); setConnectionStatus('offline');
-            if (hasShownWelcome.current) setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: getServiceUnavailableMessage('inactive'), createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+            if (hasShownWelcome.current) {
+              setMessages(prev => [...prev, {
+                id: uuidv4(), sender: 'support-bot',
+                message: getServiceUnavailableMessage('inactive'),
+                createdAt: new Date().toISOString(), isAdmin: true, isError: true
+              }]);
+            }
             return;
           }
           const databaseUrl = result.websiteUrl || '';
           if (databaseUrl && !checkUrlMatch(databaseUrl, currentUrl)) {
             setIsWebsiteActive(false); setWebsiteStatus('url_mismatch'); setConnectionStatus('offline');
-            if (hasShownWelcome.current) setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: getServiceUnavailableMessage('url_mismatch'), createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+            if (hasShownWelcome.current) {
+              setMessages(prev => [...prev, {
+                id: uuidv4(), sender: 'support-bot',
+                message: getServiceUnavailableMessage('url_mismatch'),
+                createdAt: new Date().toISOString(), isAdmin: true, isError: true
+              }]);
+            }
             return;
           }
           setConnectionStatus('online');
@@ -535,80 +587,141 @@ const ChatWidget = ({
       } catch { setConnectionStatus('offline'); }
     };
     checkConnection();
-    const interval = setInterval(checkConnection, 10000);
+    const interval = setInterval(checkConnection, 8000);
     return () => clearInterval(interval);
   }, [apiBaseUrl, isWebsiteActive, backendApiKey, websiteStatus, parentWebsiteUrl]);
 
   const handleInactiveInteraction = () => {
     if (websiteStatus === 'inactive') {
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: getServiceUnavailableMessage('inactive'), createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot',
+        message: getServiceUnavailableMessage('inactive'),
+        createdAt: new Date().toISOString(), isAdmin: true, isError: true
+      }]);
     }
     return false;
   };
 
-  // ─── Prompt flow helpers ───────────────────────────────────────
+  /* ── Typing done callback ──────────────────────────────── */
+  // Jab latest bot message ki typing complete ho:
+  // 1. isTyping false karo (input enable ho jayega)
+  // 2. pending suggestions set karo
+  const handleLatestMessageTypingDone = () => {
+    setIsTyping(false);
+    if (pendingSuggestionsRef.current.length > 0) {
+      setSuggestedPrompts(pendingSuggestionsRef.current);
+      pendingSuggestionsRef.current = [];
+    }
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  };
+
+  /* ── Prompt flow ───────────────────────────────────────── */
   const completePromptFlow = (data) => {
-    if (!isWebsiteActive) { handleInactiveInteraction(); return; }
-    const transformedData = storedPromptsWithParams?.length > 0 ? transformDataWithParams(data, storedPromptsWithParams) : { ...data };
+    if (!chatEnabled || !isWebsiteActive) { handleInactiveInteraction(); return; }
+    const transformedData = storedPromptsWithParams?.length > 0
+      ? transformDataWithParams(data, storedPromptsWithParams)
+      : { ...data };
     setCollectedData(data);
     setTransformedDataForAPI(transformedData);
     const clientSummary = createClientSummary(data);
-    setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: clientSummary, createdAt: new Date().toISOString(), isAdmin: true }]);
+
+    setMessages(prev => [...prev, {
+      id: uuidv4(), sender: 'support-bot', message: clientSummary,
+      createdAt: new Date().toISOString(), isAdmin: true,
+    }]);
     saveSingleMessage('support-bot', clientSummary);
+
+    const wordCount   = clientSummary.split(/\s+/).length;
+    const typingDelay = Math.max(1500, wordCount * 75 + 500);
+
     setTimeout(() => {
       const confirmMsg = 'All done! Would you like to confirm this request?';
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: confirmMsg, createdAt: new Date().toISOString(), isAdmin: true }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: confirmMsg,
+        createdAt: new Date().toISOString(), isAdmin: true,
+      }]);
       saveSingleMessage('support-bot', confirmMsg);
-      setIsConfirming(true);
       setCurrentPromptFlow(null);
-    }, 1000);
+
+      const confirmWordCount = confirmMsg.split(/\s+/).length;
+      const confirmDelay     = Math.max(800, confirmWordCount * 75 + 400);
+      setTimeout(() => { setIsConfirming(true); }, confirmDelay);
+    }, typingDelay);
   };
 
   const handleConfirmResponse = async (answer) => {
-    if (!isWebsiteActive) { handleInactiveInteraction(); return; }
+    if (!chatEnabled || !isWebsiteActive) { handleInactiveInteraction(); return; }
     setIsConfirming(false);
     setCurrentChildOptions([]);
-    setMessages(prev => [...prev, { id: uuidv4(), sender: 'user', message: answer, createdAt: new Date().toISOString(), isAdmin: false }]);
+    setMessages(prev => [...prev, {
+      id: uuidv4(), sender: 'user', message: answer,
+      createdAt: new Date().toISOString(), isAdmin: false
+    }]);
     await saveSingleMessage('user', answer);
+
     try {
       if (answer === 'Yes') {
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: 'Saving your request...', createdAt: new Date().toISOString(), isAdmin: true, _isTemp: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: 'Saving your request...',
+          createdAt: new Date().toISOString(), isAdmin: true, _isTemp: true
+        }]);
         const serverSummary = createServerSummary(collectedData, storedPromptsWithParams);
         const formData      = new FormData();
         if (activeConfig?.id)   formData.append('websiteId',  activeConfig.id);
         if (selectedPromptName) formData.append('promptName', selectedPromptName);
         if (transformedDataForAPI && Object.keys(transformedDataForAPI).length > 0) {
           Object.entries(transformedDataForAPI).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') formData.append(key, String(value));
+            if (value !== undefined && value !== null && value !== '') {
+              formData.append(key, String(value));
+            }
           });
         }
         const summaryParamKey = findSummaryParamKey(storedSummaryList);
         if (summaryParamKey && serverSummary) formData.append(summaryParamKey, serverSummary);
+
         let urlCallResults = [];
         if (activeConfig?.id && selectedPromptName) {
           const execResult = await executeUrls(apiBaseUrl, formData);
           urlCallResults   = execResult.results || [];
         }
-        const chatRequestData = { websiteId: activeConfig?.id, collectedData: transformedDataForAPI || {}, backendApiKey };
+        const chatRequestData = {
+          websiteId: activeConfig?.id, collectedData: transformedDataForAPI || {}, backendApiKey
+        };
         if (urlCallResults.length > 0) chatRequestData.urlCallResults = urlCallResults;
+
         const saveResult = await saveChatRequest(apiBaseUrl, backendApiKey, chatRequestData);
         if (saveResult.success) {
           setMessages(prev => prev.filter(msg => msg._isTemp !== true));
           const successMessage = getSuccessMessage();
-          setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: successMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
+          setMessages(prev => [...prev, {
+            id: uuidv4(), sender: 'support-bot', message: successMessage,
+            createdAt: new Date().toISOString(), isAdmin: true
+          }]);
           await saveSingleMessage('support-bot', successMessage);
+          setTimeout(() => setSuggestedPrompts(allCustomPrompts), 800);
         } else { throw new Error(saveResult.error || 'Failed to save request'); }
       } else {
-        await saveChatRequest(apiBaseUrl, backendApiKey, { websiteId: activeConfig?.id, collectedData: transformedDataForAPI || {}, backendApiKey });
+        await saveChatRequest(apiBaseUrl, backendApiKey, {
+          websiteId: activeConfig?.id, collectedData: transformedDataForAPI || {}, backendApiKey
+        });
         const cancelMessage = getCancelMessage();
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: cancelMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: cancelMessage,
+          createdAt: new Date().toISOString(), isAdmin: true
+        }]);
         await saveSingleMessage('support-bot', cancelMessage);
+        setTimeout(() => setSuggestedPrompts(allCustomPrompts), 800);
       }
     } catch (error) {
       console.error('Error in handleConfirmResponse:', error);
       setMessages(prev => prev.filter(msg => msg._isTemp !== true));
       const errorMessage = getErrorMessage();
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: errorMessage, createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: errorMessage,
+        createdAt: new Date().toISOString(), isAdmin: true, isError: true
+      }]);
       await saveSingleMessage('support-bot', errorMessage);
     } finally {
       setCollectedData({}); setTransformedDataForAPI({}); setCurrentPromptFlow(null);
@@ -618,7 +731,7 @@ const ChatWidget = ({
   };
 
   const moveToNextQuestion = async (data) => {
-    if (!isWebsiteActive) { handleInactiveInteraction(); return; }
+    if (!chatEnabled || !isWebsiteActive) { handleInactiveInteraction(); return; }
     const { prompts, promptIndex, questionIndex } = currentPromptFlow;
     const currentPrompt = prompts[promptIndex];
 
@@ -678,7 +791,9 @@ const ChatWidget = ({
             const botMessage = makeFriendly(nextPrompt.text);
             setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: botMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
             await saveSingleMessage('support-bot', botMessage);
-            if (nextPrompt.children?.length > 0) setTimeout(() => showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex), 1000);
+            if (nextPrompt.children?.length > 0) {
+              setTimeout(() => showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex), 1000);
+            }
           }
         } else {
           setCurrentPromptFlow({ ...currentPromptFlow, promptIndex: nextPromptIndex, questionIndex: 0, currentQuestion: nextPrompt, waitingForOption: false, childOptions: null, isSingleChild: false });
@@ -693,23 +808,34 @@ const ChatWidget = ({
   const showOptionsAfterQuestion = async (children, prompts, promptIndex) => {
     if (children.length > 1) {
       setCurrentChildOptions(children.map(child => child.text));
-      setCurrentPromptFlow(prev => ({ ...prev, waitingForOption: true, childOptions: children, currentQuestion: { text: 'Select Option' } }));
+      setCurrentPromptFlow(prev => ({
+        ...prev, waitingForOption: true, childOptions: children,
+        currentQuestion: { text: 'Select Option' }
+      }));
     } else if (children.length === 1) {
       const singleChild = children[0];
-      setCurrentPromptFlow(prev => ({ ...prev, waitingForOption: false, currentQuestion: singleChild, isSingleChild: true }));
+      setCurrentPromptFlow(prev => ({
+        ...prev, waitingForOption: false, currentQuestion: singleChild, isSingleChild: true
+      }));
       const botMessage = makeFriendly(singleChild.text);
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: botMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: botMessage,
+        createdAt: new Date().toISOString(), isAdmin: true
+      }]);
       await saveSingleMessage('support-bot', botMessage);
     }
   };
 
   const handleOptionSelect = async (optionText) => {
-    if (!isWebsiteActive) { handleInactiveInteraction(); return; }
+    if (!chatEnabled || !isWebsiteActive) { handleInactiveInteraction(); return; }
     const { prompts, promptIndex, childOptions } = currentPromptFlow;
     const selectedOption = childOptions.find(opt => opt.text === optionText);
     if (!selectedOption) {
       const errorMsg = 'Please select a valid option from the available choices.';
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: errorMsg, createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: errorMsg,
+        createdAt: new Date().toISOString(), isAdmin: true, isError: true
+      }]);
       await saveSingleMessage('support-bot', errorMsg);
       return;
     }
@@ -718,15 +844,23 @@ const ChatWidget = ({
     setCurrentChildOptions([]);
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage.isOptions) {
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'user', message: optionText, createdAt: new Date().toISOString(), isAdmin: false }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'user', message: optionText,
+        createdAt: new Date().toISOString(), isAdmin: false
+      }]);
       await saveSingleMessage('user', optionText);
     }
     if (selectedOption.children?.length > 0) {
       if (selectedOption.children.length === 1) {
         const singleChild = selectedOption.children[0];
-        setCurrentPromptFlow(prev => ({ ...prev, waitingForOption: false, currentQuestion: singleChild, isSingleChild: true }));
+        setCurrentPromptFlow(prev => ({
+          ...prev, waitingForOption: false, currentQuestion: singleChild, isSingleChild: true
+        }));
         const botMessage = makeFriendly(singleChild.text);
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: botMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: botMessage,
+          createdAt: new Date().toISOString(), isAdmin: true
+        }]);
         await saveSingleMessage('support-bot', botMessage);
       } else {
         setTimeout(() => showOptionsAfterQuestion(selectedOption.children, prompts, promptIndex), 500);
@@ -747,7 +881,9 @@ const ChatWidget = ({
             const botMessage = makeFriendly(nextPrompt.text);
             setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: botMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
             await saveSingleMessage('support-bot', botMessage);
-            if (nextPrompt.children?.length > 0) setTimeout(() => showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex), 1000);
+            if (nextPrompt.children?.length > 0) {
+              setTimeout(() => showOptionsAfterQuestion(nextPrompt.children, prompts, nextPromptIndex), 1000);
+            }
           }
         } else {
           setCurrentPromptFlow({ ...currentPromptFlow, promptIndex: nextPromptIndex, questionIndex: 0, currentQuestion: nextPrompt, waitingForOption: false, childOptions: null, isSingleChild: false });
@@ -760,7 +896,7 @@ const ChatWidget = ({
   };
 
   const handlePromptFlowResponse = (userAnswer) => {
-    if (!isWebsiteActive) { handleInactiveInteraction(); return; }
+    if (!chatEnabled || !isWebsiteActive) { handleInactiveInteraction(); return; }
     const { currentQuestion } = currentPromptFlow;
     const fieldType           = getFieldType(currentQuestion.text);
     if (!validateInput(fieldType, userAnswer)) {
@@ -773,7 +909,10 @@ const ChatWidget = ({
         case 'url':    errorMessage = 'Please enter a valid URL (e.g., http://example.com)'; break;
         default:       errorMessage = 'Please provide a valid response';
       }
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: errorMessage, createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: errorMessage,
+        createdAt: new Date().toISOString(), isAdmin: true, isError: true
+      }]);
       saveSingleMessage('support-bot', errorMessage);
       return;
     }
@@ -783,10 +922,10 @@ const ChatWidget = ({
   };
 
   const findMatchingPrompt = (aiResponse) => {
-    if (!aiResponse || !suggestedPrompts.length) return null;
+    if (!aiResponse || !allCustomPrompts.length) return null;
     const aiResponseLower = aiResponse.toLowerCase();
     let bestMatch = null, highestScore = 0;
-    suggestedPrompts.forEach(prompt => {
+    allCustomPrompts.forEach(prompt => {
       if (!prompt || typeof prompt !== 'string') return;
       const promptLower   = prompt.toLowerCase();
       let score           = 0;
@@ -804,9 +943,17 @@ const ChatWidget = ({
   };
 
   const handlePromptClick = async (promptName) => {
+    if (!chatEnabled) return;
     if (!isWebsiteActive) { handleInactiveInteraction(); return; }
+
+    setSuggestedPrompts([]);
+    pendingSuggestionsRef.current = [];
     setAutoClickInProgress(false);
+    userHasMessagedRef.current = true;
+
     setIsLoading(true);
+    setIsTyping(false);
+
     try {
       const data              = await fetchChildPrompts(apiBaseUrl, backendApiKey, activeConfig?.id, promptName);
       const promptsWithParams = data.promptsWithParams || [];
@@ -816,12 +963,27 @@ const ChatWidget = ({
       const prompts = data.prompts || (data.items?.length ? data.items.flatMap(item => item.prompts) : []);
       setCollectedData({}); setTransformedDataForAPI({}); setCurrentChildOptions([]);
 
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'user', message: promptName, createdAt: new Date().toISOString(), isAdmin: false }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'user', message: promptName,
+        createdAt: new Date().toISOString(), isAdmin: false,
+      }]);
       await saveSingleMessage('user', promptName);
 
+      await new Promise(resolve => setTimeout(resolve, 600));
+
       const introMessage = getPromptIntroMessage(promptName);
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: introMessage, createdAt: new Date().toISOString(), isAdmin: true }]);
+      setIsLoading(false);
+      setIsTyping(true);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: introMessage,
+        createdAt: new Date().toISOString(), isAdmin: true,
+      }]);
       await saveSingleMessage('support-bot', introMessage);
+
+      const introWordCount  = introMessage.split(/\s+/).length;
+      const introTypingWait = Math.max(800, introWordCount * 75 + 400);
+      await new Promise(resolve => setTimeout(resolve, introTypingWait));
+      setIsTyping(false);
 
       if (prompts.length > 0) {
         const firstPrompt = prompts[0];
@@ -855,29 +1017,38 @@ const ChatWidget = ({
       console.error('Prompt Click Error:', err);
       const botMsg = `I'd love to help with ${promptName}! Please share what you need!`;
       setMessages(prev => [...prev,
-        { id: uuidv4(), sender: 'user', message: promptName, createdAt: new Date().toISOString(), isAdmin: false },
-        { id: uuidv4(), sender: 'support-bot', message: botMsg, createdAt: new Date().toISOString(), isAdmin: true }
+        { id: uuidv4(), sender: 'user',        message: promptName, createdAt: new Date().toISOString(), isAdmin: false },
+        { id: uuidv4(), sender: 'support-bot', message: botMsg,     createdAt: new Date().toISOString(), isAdmin: true  }
       ]);
       await saveSingleMessage('user', promptName);
       await saveSingleMessage('support-bot', botMsg);
       setCurrentPromptFlow(null);
     } finally {
-      setTimeout(() => { setAutoClickInProgress(false); setIsLoading(false); }, 2000);
+      setIsLoading(false);
+      setIsTyping(false);
+      setAutoClickInProgress(false);
+      setSuggestedPrompts([]);
     }
   };
 
   const handleNextQuestion = (userAnswer = '') => {
-    if (!isWebsiteActive) { handleInactiveInteraction(); return; }
+    if (!chatEnabled || !isWebsiteActive) { handleInactiveInteraction(); return; }
     if (pendingQuestions.length > 0) {
       const [next, ...rest] = pendingQuestions;
       setPendingQuestions(rest);
       const botMsg = makeFriendly(next);
-      setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: botMsg, createdAt: new Date().toISOString(), isAdmin: true }]);
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: botMsg,
+        createdAt: new Date().toISOString(), isAdmin: true
+      }]);
       saveSingleMessage('support-bot', botMsg);
     } else if (!isConfirming && messages.length > 0) {
       setTimeout(async () => {
         const confirmMsg = 'All done! Would you like to confirm this request?';
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: confirmMsg, createdAt: new Date().toISOString(), isAdmin: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: confirmMsg,
+          createdAt: new Date().toISOString(), isAdmin: true
+        }]);
         await saveSingleMessage('support-bot', confirmMsg);
         setIsConfirming(true);
       }, 700);
@@ -888,19 +1059,31 @@ const ChatWidget = ({
     if (isFullScreen && chatInputRef.current) setTimeout(() => forceScrollToBottom(), 300);
   };
 
-  // ─── Main message handler ──────────────────────────────────────
+  /* ── Main send message ─────────────────────────────────── */
   const handleSendMessage = async (text) => {
-    if (!text.trim() || isLoading) return;
+    if (!text.trim() || isLoading || isTyping) return;
+    if (!chatEnabled) return;
     if (!isWebsiteActive) { handleInactiveInteraction(); return; }
     setLastActivity(Date.now());
 
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.sender === 'user' && lastMessage.message === text) {
       const timeDiff = Math.abs(new Date() - new Date(lastMessage.createdAt));
-      if (timeDiff < 3000) {  return; }
+      if (timeDiff < 3000) return;
     }
 
-    setMessages(prev => [...prev, { id: uuidv4(), sender: 'user', message: text, createdAt: new Date().toISOString(), isAdmin: false }]);
+    // Purani suggestions turant clear karo
+    setSuggestedPrompts([]);
+    pendingSuggestionsRef.current = [];
+
+    if (!userHasMessagedRef.current) {
+      userHasMessagedRef.current = true;
+    }
+
+    setMessages(prev => [...prev, {
+      id: uuidv4(), sender: 'user', message: text,
+      createdAt: new Date().toISOString(), isAdmin: false
+    }]);
     setInputMessage('');
     await saveSingleMessage('user', text);
 
@@ -908,7 +1091,9 @@ const ChatWidget = ({
     if (currentPromptFlow?.currentQuestion)          { handlePromptFlowResponse(text); return; }
     if (pendingQuestions.length > 0 || isConfirming) { setTimeout(() => handleNextQuestion(text), 800); return; }
 
-    const lastBotMessage = messages.slice().reverse().find(msg => msg.sender === 'support-bot' && msg.isAdmin);
+    const lastBotMessage = messages.slice().reverse().find(
+      msg => msg.sender === 'support-bot' && msg.isAdmin
+    );
     const isEmailRequest = lastBotMessage && (
       lastBotMessage.message.includes('email address') ||
       lastBotMessage.message.includes('Please provide your email')
@@ -918,23 +1103,38 @@ const ChatWidget = ({
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(text.trim())) {
         const errorMsg = 'Please provide a valid email address (e.g., name@example.com)';
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: errorMsg, createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: errorMsg,
+          createdAt: new Date().toISOString(), isAdmin: true, isError: true
+        }]);
         await saveSingleMessage('support-bot', errorMsg);
         return;
       }
       setIsLoading(true);
       try {
         const allAIMessages = messages.filter(msg => msg.sender === 'support-bot' && msg.isAdmin);
-        const emailData = { email: text.trim(), lastMessage: allAIMessages[allAIMessages.length - 1]?.message || '', secondLastMessage: allAIMessages[allAIMessages.length - 2]?.message || '' };
-        const saveResult = await saveEmailRequest(apiBaseUrl, backendApiKey, { websiteId: activeConfig?.id, collectedData: emailData, backendApiKey });
+        const emailData     = {
+          email:             text.trim(),
+          lastMessage:       allAIMessages[allAIMessages.length - 1]?.message || '',
+          secondLastMessage: allAIMessages[allAIMessages.length - 2]?.message || ''
+        };
+        const saveResult = await saveEmailRequest(apiBaseUrl, backendApiKey, {
+          websiteId: activeConfig?.id, collectedData: emailData, backendApiKey
+        });
         if (saveResult.success) {
           const successMsg = 'Thank you! Your email has been saved. Our team will contact you shortly regarding this.';
-          setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: successMsg, createdAt: new Date().toISOString(), isAdmin: true }]);
+          setMessages(prev => [...prev, {
+            id: uuidv4(), sender: 'support-bot', message: successMsg,
+            createdAt: new Date().toISOString(), isAdmin: true
+          }]);
           await saveSingleMessage('support-bot', successMsg);
         } else { throw new Error(saveResult.error || 'Failed to save request'); }
       } catch {
         const errorMsg = 'Sorry, there was an error saving your email. Please try again.';
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: errorMsg, createdAt: new Date().toISOString(), isAdmin: true, isError: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: errorMsg,
+          createdAt: new Date().toISOString(), isAdmin: true, isError: true
+        }]);
         await saveSingleMessage('support-bot', errorMsg);
       } finally { setIsLoading(false); }
       return;
@@ -946,7 +1146,10 @@ const ChatWidget = ({
     if (userShowsNotInterest) {
       setTimeout(async () => {
         const notInterestMsg = 'No problem! If you have any other questions, feel free to ask. How else can I help you?';
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: notInterestMsg, createdAt: new Date().toISOString(), isAdmin: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: notInterestMsg,
+          createdAt: new Date().toISOString(), isAdmin: true
+        }]);
         await saveSingleMessage('support-bot', notInterestMsg);
       }, 500);
       return;
@@ -957,39 +1160,72 @@ const ChatWidget = ({
       if (matchingPrompt && !autoClickInProgress) {
         setAutoClickInProgress(true);
         const processingMsg = `Great! I'll help you with ${matchingPrompt}. Setting it up for you...`;
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: processingMsg, createdAt: new Date().toISOString(), isAdmin: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: processingMsg,
+          createdAt: new Date().toISOString(), isAdmin: true
+        }]);
         await saveSingleMessage('support-bot', processingMsg);
         setTimeout(() => handlePromptClick(matchingPrompt), 1500);
         return;
       }
       if (!matchingPrompt) {
-        setIsLoading(true);
         const aiTopic  = extractMainTopic(lastAIMessage);
         const emailMsg = aiTopic
           ? `Please provide your email address, we will get you in touch regarding "${aiTopic}"`
           : `Please provide your email address, we will get you in touch regarding this`;
-        setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: emailMsg, createdAt: new Date().toISOString(), isAdmin: true }]);
+        setMessages(prev => [...prev, {
+          id: uuidv4(), sender: 'support-bot', message: emailMsg,
+          createdAt: new Date().toISOString(), isAdmin: true
+        }]);
         await saveSingleMessage('support-bot', emailMsg);
-        setIsLoading(false);
         return;
       }
     }
 
+    // ── AI response fetch ──
+    // Three dots show karo (isLoading = true)
     setIsLoading(true);
-    const { response }    = await generateAIResponse(apiBaseUrl, backendApiKey, text);
-    const cleanedResponse = cleanText(response);
+    try {
+      const { response, suggestions } = await generateAIResponse(apiBaseUrl, backendApiKey, text);
+      const cleanedResponse = cleanText(response);
 
-    const lastBotMsg = messages[messages.length - 1];
-    if (lastBotMsg && lastBotMsg.sender === 'support-bot' && lastBotMsg.message === cleanedResponse) {
-     
+      const lastBotMsg = messages[messages.length - 1];
+      if (lastBotMsg && lastBotMsg.sender === 'support-bot' && lastBotMsg.message === cleanedResponse) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Three dots hatao, typing shuru karo
       setIsLoading(false);
-      return;
-    }
+      setIsTyping(true);
 
-    setMessages(prev => [...prev, { id: uuidv4(), sender: 'support-bot', message: cleanedResponse, createdAt: new Date().toISOString(), isAdmin: true }]);
-    await saveSingleMessage('support-bot', cleanedResponse);
-    setLastAIMessage(cleanedResponse);
-    setIsLoading(false);
+      // Agar suggestions hain to pending mein rakho — typing done pe set honge
+      if (suggestions && suggestions.length > 0 && !currentPromptFlow) {
+        pendingSuggestionsRef.current = suggestions;
+      } else {
+        pendingSuggestionsRef.current = [];
+      }
+
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: cleanedResponse,
+        createdAt: new Date().toISOString(), isAdmin: true
+      }]);
+      await saveSingleMessage('support-bot', cleanedResponse);
+      setLastAIMessage(cleanedResponse);
+      // isTyping false aur suggestions set handleLatestMessageTypingDone mein honge
+
+    } catch (err) {
+      console.error('AI response error:', err);
+      const errMsg = "I'm having trouble right now. Please try again.";
+      setIsLoading(false);
+      setIsTyping(false);
+      pendingSuggestionsRef.current = [];
+      setMessages(prev => [...prev, {
+        id: uuidv4(), sender: 'support-bot', message: errMsg,
+        createdAt: new Date().toISOString(), isAdmin: true, isError: true
+      }]);
+      await saveSingleMessage('support-bot', errMsg);
+    }
   };
 
   const handleCloseChat = () => {
@@ -998,11 +1234,28 @@ const ChatWidget = ({
     setCurrentPromptFlow(null); setCollectedData({}); setTransformedDataForAPI({});
     setCurrentChildOptions([]); setStoredUrls([]); setStoredApiKeys([]);
     setStoredPromptsWithParams([]); setRecentTopics([]); setAutoClickInProgress(false);
+    setIsTyping(false);
+    pendingSuggestionsRef.current = [];
   };
 
-  const isInputDisabled = isLoading || isConfirming ||
+  // ✅ Input disable sirf in cases mein:
+  // - token limit reach
+  // - AI response ka wait (isLoading)
+  // - Bot message type ho raha hai (isTyping)  
+  // - Confirm buttons dikh rahe hain
+  // - Options select karne hain
+  // - Website inactive
+  // - Auto click progress
+  const isInputDisabled =
+    !chatEnabled ||
+    isLoading ||
+    isTyping ||
+    isConfirming ||
     (currentPromptFlow && currentPromptFlow.waitingForOption) ||
-    !isWebsiteActive || autoClickInProgress || isSaving;
+    !isWebsiteActive ||
+    autoClickInProgress;
+
+  const visibleSuggestedPrompts = chatEnabled ? suggestedPrompts : [];
 
   if (!isMounted || typeof window === 'undefined') {
     return (
@@ -1031,32 +1284,53 @@ const ChatWidget = ({
               apiBaseUrl={apiBaseUrl} backendApiKey={backendApiKey}
               isWebsiteActive={isWebsiteActive} websiteStatus={websiteStatus}
               showCloseButton={isFullScreen} headerColor={headerColor}
+              tokenDetails={tokenDetails}
             />
           </div>
           <div className={styles.chatBodyWrapper} ref={chatBodyRef}>
             <ChatBody
-              messages={messages} isLoading={isLoading}
-              primaryColor={primaryColor} secondaryColor={secondaryColor}
-              apiBaseUrl={apiBaseUrl} backendApiKey={backendApiKey}
-              onPromptClick={handlePromptClick} onConfirmClick={handleConfirmResponse}
-              onOptionSelect={handleOptionSelect} showConfirmButtons={isConfirming}
-              currentPromptFlow={currentPromptFlow} suggestedPrompts={suggestedPrompts}
-              currentChildOptions={currentChildOptions} isWebsiteActive={isWebsiteActive}
-              websiteStatus={websiteStatus} messageAnimations={messageAnimations}
-              isFullScreen={isFullScreen} isKeyboardVisible={isKeyboardVisible}
+              messages={messages}
+              isLoading={isLoading}
+              primaryColor={primaryColor}
+              secondaryColor={secondaryColor}
+              apiBaseUrl={apiBaseUrl}
+              backendApiKey={backendApiKey}
+              onPromptClick={chatEnabled ? handlePromptClick : () => {}}
+              onConfirmClick={chatEnabled ? handleConfirmResponse : () => {}}
+              onOptionSelect={chatEnabled ? handleOptionSelect : () => {}}
+              showConfirmButtons={chatEnabled ? isConfirming : false}
+              currentPromptFlow={chatEnabled ? currentPromptFlow : null}
+              suggestedPrompts={visibleSuggestedPrompts}
+              currentChildOptions={chatEnabled ? currentChildOptions : []}
+              isWebsiteActive={isWebsiteActive}
+              websiteStatus={websiteStatus}
+              messageAnimations={messageAnimations}
+              isFullScreen={isFullScreen}
+              isKeyboardVisible={isKeyboardVisible}
+              tokenDetails={tokenDetails}
+              onLatestMessageTypingDone={handleLatestMessageTypingDone}
             />
             <div ref={messagesEndRef} />
           </div>
           <div className={styles.inputWrapper} ref={inputWrapperRef}>
             <ChatInput
-              ref={chatInputRef} inputMessage={inputMessage}
-              setInputMessage={setInputMessage} sendMessage={handleSendMessage}
-              disabled={isInputDisabled} primaryColor={primaryColor}
-              isWebsiteActive={isWebsiteActive} websiteStatus={websiteStatus}
-              isFullScreen={isFullScreen} onFocus={handleInputFocus}
-              headerColor={headerColor} poweredByText={poweredByText} poweredByUrl={poweredByUrl}
+              ref={chatInputRef}
+              inputMessage={inputMessage}
+              setInputMessage={setInputMessage}
+              sendMessage={handleSendMessage}
+              disabled={isInputDisabled}
+              primaryColor={primaryColor}
+              isWebsiteActive={isWebsiteActive}
+              websiteStatus={websiteStatus}
+              isFullScreen={isFullScreen}
+              onFocus={handleInputFocus}
+              headerColor={headerColor}
+              poweredByText={poweredByText}
+              poweredByUrl={poweredByUrl}
             />
-            {isFullScreen && <div className={styles.safeAreaBottom} style={{ height: safeAreaInsets.bottom }} />}
+            {isFullScreen && (
+              <div className={styles.safeAreaBottom} style={{ height: safeAreaInsets.bottom }} />
+            )}
           </div>
           {autoClickInProgress && (
             <div className={styles.autoClickIndicator}>

@@ -1,27 +1,71 @@
+// pages/api/payment/verify.js
 import crypto from "crypto";
 import Stripe from "stripe";
+import Razorpay from "razorpay";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]"; 
 import { getPlanById } from "../../../app/model/plan-db";
-import { createSubscription } from "../../../app/model/subscription-db";
+import { createSubscription, getSubscriptionByOrderId } from "../../../app/model/subscription-db";
 import { updateUserPlan } from "../../../app/model/user-db"; 
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const razorpay = new Razorpay({
+  key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 export default async function handler(req, res) {
-  // =================================================================
-  // 1. RAZORPAY SUBSCRIPTION VERIFICATION
-  // =================================================================
-  if (req.method === 'POST') {
-    try {
-      const session = await getServerSession(req, res, authOptions);
-      if (!session) return res.status(401).json({ error: "Unauthorized" });
+  // Allow GET for Stripe redirects, POST for Razorpay verifications
+  if (req.method !== 'POST' && req.method !== 'GET') {
+      return res.status(405).json({ error: "Method not allowed" });
+  }
 
-      // Notice we are grabbing razorpay_subscription_id now!
-      const { razorpay_subscription_id, razorpay_payment_id, razorpay_signature, planId, billingCycle = "monthly" } = req.body;
+  try {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session) return res.status(401).json({ error: "Unauthorized" });
 
-      // Verify Razorpay Subscription Signature
-      // The formula for subscriptions is: payment_id + "|" + subscription_id
+    let gatewayUsed = null;
+    let finalOrderId = null;
+    let finalPaymentId = null;
+    let actualPaidAmount = 0;
+    
+    // We will extract these securely from the Gateways, NOT from the user's request
+    let planId = null;
+    let billingCycle = "monthly";
+    let isTrial = false;
+
+    // ==========================================
+    // 1. STRIPE VERIFICATION (Handles GET Redirect)
+    // ==========================================
+    if (req.body?.stripe_session_id || req.query?.session_id) {
+      const sessionId = req.body?.stripe_session_id || req.query?.session_id;
+      const stripeSession = await stripe.checkout.sessions.retrieve(sessionId);
+
+      if (stripeSession.status !== 'complete') {
+        return res.redirect('/dashboard?payment_success=false&error=payment_incomplete');
+      }
+
+      // FIX #01 & #02: Extract plan data securely from Stripe metadata
+      planId = stripeSession.metadata?.planId;
+      billingCycle = stripeSession.metadata?.billingCycle || "monthly";
+      gatewayUsed = "Stripe";
+      finalOrderId = stripeSession.subscription; 
+      finalPaymentId = stripeSession.payment_intent || stripeSession.subscription;
+      
+      // Amount total is securely provided by Stripe (in cents)
+      actualPaidAmount = stripeSession.amount_total ? (stripeSession.amount_total / 100) : 0; 
+      
+      // If Stripe charged $0 and it's active, it's a 14-day trial checkout
+      if (actualPaidAmount === 0 && stripeSession.status === 'complete') {
+         isTrial = true;
+      }
+    } 
+    // ==========================================
+    // 2. RAZORPAY VERIFICATION (Handles POST)
+    // ==========================================
+    else if (req.body?.razorpay_subscription_id) {
+      const { razorpay_subscription_id, razorpay_payment_id, razorpay_signature } = req.body;
+      
       const body = razorpay_payment_id + "|" + razorpay_subscription_id;
       const expectedSignature = crypto
         .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -29,276 +73,106 @@ export default async function handler(req, res) {
         .digest("hex");
 
       if (expectedSignature !== razorpay_signature) {
-        return res.status(400).json({ error: "Invalid signature" });
+        return res.status(400).json({ error: "Razorpay Invalid Signature" });
       }
 
-      const plan = await getPlanById(planId);
-      if (!plan) return res.status(400).json({ error: "Plan not found" });
-
-      const durationDays = billingCycle === 'yearly' ? 365 : (plan.duration || 30);
-      const graceDays = plan.grace_period || 7;
+      // FIX #02: Fetch subscription directly from Razorpay to prevent payload spoofing
+      const rzpSub = await razorpay.subscriptions.fetch(razorpay_subscription_id);
       
-      const expireDate = new Date();
-      expireDate.setDate(expireDate.getDate() + durationDays);
+      planId = rzpSub.notes?.planId;
+      billingCycle = rzpSub.notes?.billingCycle || "monthly";
       
-      const graceExpireDate = new Date(expireDate);
-      graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
-
-      let finalPriceInr = Number(plan.amount);
-      if (billingCycle === 'yearly' && plan.allowed_billing_cycles?.includes('yearly')) {
-        const discountPercent = Number(plan.yearly_discount) || 20;
-        finalPriceInr = (finalPriceInr * 12) * ((100 - discountPercent) / 100);
+      // If Razorpay's billing start date is in the future, it's a trial
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      if (rzpSub.start_at && rzpSub.start_at > nowSeconds + 86400) { 
+         isTrial = true;
       }
-      finalPriceInr = Math.round(finalPriceInr);
 
-      // Save the initial subscription to our DB
-      const subResult = await createSubscription({
-        paymentId: razorpay_payment_id,
-        orderId: razorpay_subscription_id, // Save the recurring sub ID here!
-        userId: session.user.id,
-        planId: plan.plan_id,
-        amount: finalPriceInr, 
-        currency: "INR",
-        gateway: "Razorpay",
-        billing_cycle: billingCycle, 
-        expireDate: expireDate.toISOString(),
-        graceExpireDate: graceExpireDate.toISOString(),
-        system_features: plan.system_features || plan.features || {}, 
-        display_features: plan.display_features || [] 
-      });
-
-      if (!subResult.success) throw new Error(subResult.error);
-      await updateUserPlan(session.user.id, plan.plan_id);
-
-      return res.status(200).json({ success: true });
-
-    } catch (error) {
-      console.error("Razorpay Verify Error:", error);
-      return res.status(500).json({ error: error.message });
+      gatewayUsed = "Razorpay";
+      finalOrderId = razorpay_subscription_id;
+      finalPaymentId = razorpay_payment_id;
+    } 
+    else {
+      return res.status(400).json({ error: "Invalid payment payload" });
     }
-  }
 
-  // =================================================================
-  // 2. STRIPE SUBSCRIPTION VERIFICATION 
-  // =================================================================
-  else if (req.method === 'GET') {
-    try {
-      const { session_id } = req.query;
-      if (!session_id) return res.redirect('/pricing?error=NoSession');
+    // ==========================================
+    // 3. SECURE PLAN FETCHING & MATH
+    // ==========================================
+    if (!planId) throw new Error("Plan ID missing from gateway metadata");
+    
+    const planData = await getPlanById(planId);
+    if (!planData) throw new Error("Plan not found in database");
 
-      const stripeSession = await stripe.checkout.sessions.retrieve(session_id);
-      if (stripeSession.payment_status !== 'paid') {
-        return res.redirect('/pricing?error=PaymentNotCompleted');
-      }
+    // FIX #05: Calculate Razorpay amount dynamically if yearly
+    if (gatewayUsed === "Razorpay") {
+        if (billingCycle === 'yearly') {
+            const discount = planData.yearly_discount || 0;
+            actualPaidAmount = (planData.amount * 12) * ((100 - discount) / 100);
+        } else {
+            actualPaidAmount = planData.amount;
+        }
+    }
 
-      const userId = stripeSession.metadata.userId;
-      const planId = stripeSession.metadata.planId;
-      const billingCycle = stripeSession.metadata.billingCycle || "monthly";
+    // ==========================================
+    // 4. IDEMPOTENCY CHECK (Prevents Refresh Bug)
+    // ==========================================
+    if (!finalOrderId) throw new Error("Missing Order ID");
+    const existingSub = await getSubscriptionByOrderId(finalOrderId);
+    
+    if (existingSub) {
+      if (req.method === 'GET') return res.redirect('/dashboard?payment_success=true&note=already_verified');
+      return res.status(200).json({ success: true, note: "Already verified" });
+    }
 
-      const plan = await getPlanById(planId);
-      if (!plan) return res.redirect('/pricing?error=PlanNotFound');
+    // ==========================================
+    // 5. CALCULATE DATES & SAVE
+    // ==========================================
+    let expireDate = new Date();
+    
+    if (isTrial) {
+       expireDate.setDate(expireDate.getDate() + 14); 
+    } else {
+       if (billingCycle === 'yearly') {
+          expireDate.setFullYear(expireDate.getFullYear() + 1);
+       } else {
+          expireDate.setMonth(expireDate.getMonth() + 1);
+       }
+    }
 
-      // const durationDays = billingCycle === 'yearly' ? 365 : (plan.duration || 30);
-      const durationDays = billingCycle === 'yearly' ? 365 : 30;
-      const graceDays = plan.grace_period || 7;
-      
-      const expireDate = new Date();
-      expireDate.setDate(expireDate.getDate() + durationDays);
-      
-      const graceExpireDate = new Date(expireDate);
-      graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
+    // FIX #04: Grace period reads from plan config safely
+    let graceExpireDate = new Date(expireDate);
+    const graceDays = planData.grace_period !== undefined ? Number(planData.grace_period) : 3;
+    graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
 
-      let finalPriceUsd = Number(plan.amount_usd);
-      if (billingCycle === 'yearly' && plan.allowed_billing_cycles?.includes('yearly')) {
-        const discountPercent = Number(plan.yearly_discount) || 20;
-        finalPriceUsd = (finalPriceUsd * 12) * ((100 - discountPercent) / 100);
-      }
-      finalPriceUsd = parseFloat(finalPriceUsd.toFixed(2));
-      const actualPaidUsd = stripeSession.amount_total ? (stripeSession.amount_total / 100) : finalPriceUsd;
-
-      const subResult = await createSubscription({
-        // Save the actual Stripe Subscription ID so the webhook can find it later!
-        paymentId: stripeSession.subscription || stripeSession.payment_intent,
-        // orderId: stripeSession.id,
-        orderId: stripeSession.subscription,
-        userId: userId,
-        planId: plan.plan_id,
-        amount: actualPaidUsd, 
-        currency: "USD",       
-        gateway: "Stripe", 
+    const subResult = await createSubscription({
+        paymentId: finalPaymentId,
+        orderId: finalOrderId,
+        userId: session.user.id || session.user.email,
+        planId: planData.plan_id,
+        amount: actualPaidAmount, 
+        currency: gatewayUsed === "Stripe" ? "USD" : "INR",       
+        gateway: gatewayUsed, 
         billing_cycle: billingCycle,    
         expireDate: expireDate.toISOString(),
         graceExpireDate: graceExpireDate.toISOString(),
-        system_features: plan.system_features || plan.features || {}, 
-        display_features: plan.display_features || [] 
-      });
+        system_features: planData.system_features || planData.features || {}, 
+        display_features: planData.display_features || [] 
+    });
 
-      if (!subResult.success) throw new Error(subResult.error);
-      await updateUserPlan(userId, plan.plan_id);
+    if (!subResult.success) throw new Error(subResult.error);
 
-      return res.redirect('/dashboard?payment_success=true');
+    await updateUserPlan(session.user.id || session.user.email, planData.plan_id);
 
-    } catch (error) {
-      console.error("Stripe Verify Error:", error);
-      return res.redirect('/pricing?error=VerificationFailed');
+    // Return safely based on request type
+    if (req.method === 'GET') return res.redirect('/dashboard?payment_success=true');
+    return res.status(200).json({ success: true });
+
+  } catch (error) {
+    console.error("Verification Error:", error);
+    if (req.method === 'GET') {
+        return res.redirect('/dashboard?payment_success=false&error=' + encodeURIComponent(error.message));
     }
+    return res.status(500).json({ error: error.message });
   }
-
-  return res.status(405).json({ error: "Method not allowed" });
 }
-// import crypto from "crypto";
-// import Stripe from "stripe";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "../auth/[...nextauth]"; 
-// import { getPlanById } from "../../../app/model/plan-db";
-// import { createSubscription } from "../../../app/model/subscription-db";
-// import { updateUserPlan } from "../../../app/model/user-db"; 
-
-// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-// export default async function handler(req, res) {
-//   // =================================================================
-//   // 1. RAZORPAY VERIFICATION
-//   // =================================================================
-//   if (req.method === 'POST') {
-//     try {
-//       const session = await getServerSession(req, res, authOptions);
-//       if (!session) return res.status(401).json({ error: "Unauthorized" });
-
-//       const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId, billingCycle = "monthly" } = req.body;
-
-//       // Verify Razorpay Signature
-//       const body = razorpay_order_id + "|" + razorpay_payment_id;
-//       const expectedSignature = crypto
-//         .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-//         .update(body.toString())
-//         .digest("hex");
-
-//       if (expectedSignature !== razorpay_signature) {
-//         return res.status(400).json({ error: "Invalid signature" });
-//       }
-
-//       // Fetch Plan & Calculate Dates
-//       const plan = await getPlanById(planId);
-//       if (!plan) return res.status(400).json({ error: "Plan not found" });
-
-//       const durationDays = billingCycle === 'yearly' ? 365 : (plan.duration || 30);
-//       const graceDays = plan.grace_period || 7;
-      
-//       const expireDate = new Date();
-//       expireDate.setDate(expireDate.getDate() + durationDays);
-      
-//       const graceExpireDate = new Date(expireDate);
-//       graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
-
-//       // ==========================================
-//       // FIX: RECALCULATE EXACT INR AMOUNT PAID 
-//       // ==========================================
-//       let finalPriceInr = Number(plan.amount);
-//       if (billingCycle === 'yearly' && plan.allowed_billing_cycles?.includes('yearly')) {
-//         const discountPercent = Number(plan.yearly_discount) || 20;
-//         finalPriceInr = (finalPriceInr * 12) * ((100 - discountPercent) / 100);
-//       }
-//       finalPriceInr = Math.round(finalPriceInr); // Ensure it's a clean integer
-
-//       // Save to Database
-//       const subResult = await createSubscription({
-//         paymentId: razorpay_payment_id,
-//         orderId: razorpay_order_id,
-//         userId: session.user.id,
-//         planId: plan.plan_id,
-//         amount: finalPriceInr, // FIXED: Now saves the actual discounted amount
-//         currency: "INR",
-//         gateway: "Razorpay",
-//         billing_cycle: billingCycle, 
-//         expireDate: expireDate.toISOString(),
-//         graceExpireDate: graceExpireDate.toISOString(),
-//         system_features: plan.system_features || plan.features || {}, 
-//         display_features: plan.display_features || [] 
-//       });
-
-//       if (!subResult.success) throw new Error(subResult.error);
-
-//       // Update User Profile
-//       await updateUserPlan(session.user.id, plan.plan_id);
-
-//       return res.status(200).json({ success: true });
-
-//     } catch (error) {
-//       console.error("Razorpay Verify Error:", error);
-//       return res.status(500).json({ error: error.message });
-//     }
-//   }
-
-//   // =================================================================
-//   // 2. STRIPE VERIFICATION (Webhook Redirect)
-//   // =================================================================
-//   else if (req.method === 'GET') {
-//     try {
-//       const { session_id } = req.query;
-//       if (!session_id) return res.redirect('/pricing?error=NoSession');
-
-//       const stripeSession = await stripe.checkout.sessions.retrieve(session_id);
-//       if (stripeSession.payment_status !== 'paid') {
-//         return res.redirect('/pricing?error=PaymentNotCompleted');
-//       }
-
-//       const userId = stripeSession.metadata.userId;
-//       const planId = stripeSession.metadata.planId;
-//       const billingCycle = stripeSession.metadata.billingCycle || "monthly";
-
-//       const plan = await getPlanById(planId);
-//       if (!plan) return res.redirect('/pricing?error=PlanNotFound');
-
-//       const durationDays = billingCycle === 'yearly' ? 365 : (plan.duration || 30);
-//       const graceDays = plan.grace_period || 7;
-      
-//       const expireDate = new Date();
-//       expireDate.setDate(expireDate.getDate() + durationDays);
-      
-//       const graceExpireDate = new Date(expireDate);
-//       graceExpireDate.setDate(graceExpireDate.getDate() + graceDays);
-
-//       // ==========================================
-//       // FIX: GRAB EXACT USD AMOUNT PAID FROM STRIPE
-//       // ==========================================
-//       // Fallback calculation just in case
-//       let finalPriceUsd = Number(plan.amount_usd);
-//       if (billingCycle === 'yearly' && plan.allowed_billing_cycles?.includes('yearly')) {
-//         const discountPercent = Number(plan.yearly_discount) || 20;
-//         finalPriceUsd = (finalPriceUsd * 12) * ((100 - discountPercent) / 100);
-//       }
-//       finalPriceUsd = parseFloat(finalPriceUsd.toFixed(2));
-
-//       // The safest way: Stripe's session object gives us the exact total charged in Cents
-//       const actualPaidUsd = stripeSession.amount_total ? (stripeSession.amount_total / 100) : finalPriceUsd;
-
-//       // Save to Database
-//       const subResult = await createSubscription({
-//         paymentId: stripeSession.payment_intent,
-//         orderId: stripeSession.id,
-//         userId: userId,
-//         planId: plan.plan_id,
-//         amount: actualPaidUsd, // FIXED: Saves exactly what Stripe charged
-//         currency: "USD",       
-//         gateway: "Stripe", 
-//         billing_cycle: billingCycle,    
-//         expireDate: expireDate.toISOString(),
-//         graceExpireDate: graceExpireDate.toISOString(),
-//         system_features: plan.system_features || plan.features || {}, 
-//         display_features: plan.display_features || [] 
-//       });
-
-//       if (!subResult.success) throw new Error(subResult.error);
-
-//       await updateUserPlan(userId, plan.plan_id);
-//       return res.redirect('/dashboard?payment_success=true');
-
-//     } catch (error) {
-//       console.error("Stripe Verify Error:", error);
-//       return res.redirect('/pricing?error=VerificationFailed');
-//     }
-//   }
-
-//   return res.status(405).json({ error: "Method not allowed" });
-// }

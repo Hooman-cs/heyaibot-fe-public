@@ -3315,3 +3315,216 @@
     min-height: 400px;
   }
 }
+.valueCard {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s;
+}
+
+.valueCard:hover {
+  border-color: #dee2e6;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.valueHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.valueInfo {
+  flex: 1;
+}
+
+.valueName {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.valuePrice {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  background: #e8f4f8;
+  color: #007bff;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.valueDetails {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e9ecef;
+}
+
+.descriptionSection {
+  margin-bottom: 10px;
+}
+
+.descriptionSection strong,
+.tagsSection strong {
+  display: block;
+  font-size: 12px;
+  color: #6c757d;
+  margin-bottom: 5px;
+}
+
+.descriptionSection p {
+  font-size: 13px;
+  color: #495057;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.tagsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #e9ecef;
+  border-radius: 12px;
+  font-size: 11px;
+  color: #495057;
+}
+
+.tag svg {
+  font-size: 10px;
+}
+
+.noDetails {
+  font-size: 12px;
+  color: #adb5bd;
+  font-style: italic;
+}
+
+.addServiceForm {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #dee2e6;
+}
+
+.serviceInput,
+.descriptionInput,
+.tagsInput {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.serviceInput:focus,
+.descriptionInput:focus,
+.tagsInput:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Modal Styles */
+/* Error styles for validation */
+.errorInput {
+  border: 2px solid #ff0000 !important;
+  background-color: #fff0f0 !important;
+}
+
+.errorInput:focus {
+  outline: none;
+  border-color: #ff0000 !important;
+  box-shadow: 0 0 5px rgba(255, 0, 0, 0.3);
+}
+
+/* Modal Overlay - Higher z-index, no click close */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  /* pointer-events: auto; */
+}
+
+.modalContent {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 10000;
+  margin-top: 80px;
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modalForm label {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.modalForm input,
+.modalForm textarea {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.saveBtn {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.cancelBtn {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}

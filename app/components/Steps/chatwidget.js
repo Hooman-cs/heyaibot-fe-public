@@ -7,7 +7,6 @@ import ChatInput from '../ChatInput/ChatInput';
 import config from '../utils/config';
 import { v4 as uuidv4 } from 'uuid';
 
-// ── Utility imports ──────────────────────────────────────────────
 import { saveConversationToDatabase } from '../utils/api/requestApi';
 import { fetchWebsiteConfig, fetchWelcomeMessages, fetchChildPrompts, generateAIResponse } from '../utils/api/chatApi';
 import { getDatabaseUrlFromHeaderAPI, checkWebsiteConnection } from '../utils/api/websiteApi';
@@ -15,7 +14,11 @@ import { setupParentCommunication, sendCloseMessageToParent } from '../utils/com
 import { checkScreenSize, getResponsiveStyles } from '../utils/deviceUtils';
 import { transformDataWithParams, createClientSummary, createServerSummary, findSummaryParamKey } from '../utils/transformUtils';
 import { validateInput, getFieldType } from '../utils/validationUtils';
-import { checkUserInterest, checkUserNotInterest, cleanText, makeFriendly, generateWelcomeMessage, getSuccessMessage, getCancelMessage, getErrorMessage, getPromptIntroMessage, getServiceUnavailableMessage, extractMainTopic } from '../utils/textUtils';
+import {
+  checkUserInterest, checkUserNotInterest, cleanText, makeFriendly,
+  generateWelcomeMessage, getSuccessMessage, getCancelMessage,
+  getErrorMessage, getPromptIntroMessage, getServiceUnavailableMessage, extractMainTopic
+} from '../utils/textUtils';
 
 const Chatwidget = ({
   primaryColor    = '#4a6baf',
@@ -27,54 +30,61 @@ const Chatwidget = ({
   backendApiKey,
   apiBaseUrl      = config.apiBaseUrl,
 }) => {
-  // ── UI State ─────────────────────────────────────────────────────
-  const [messages,              setMessages]              = useState([]);
-  const [inputMessage,          setInputMessage]          = useState('');
-  const [isLoading,             setIsLoading]             = useState(false);
-  const [isConfirming,          setIsConfirming]          = useState(false);
-  const [messageAnimations,     setMessageAnimations]     = useState({});
-  const [isFullScreen,          setIsFullScreen]          = useState(false);
-  const [isInitialized,         setIsInitialized]         = useState(false);
-  const [autoClickInProgress,   setAutoClickInProgress]   = useState(false);
-  const [deviceInfo,            setDeviceInfo]            = useState({ isMobile: false, isTablet: false, isSmallScreen: false, screenWidth: 1024, deviceType: 'desktop' });
+  // ── UI State ──────────────────────────────────────────────────────
+  const [messages,            setMessages]            = useState([]);
+  const [inputMessage,        setInputMessage]        = useState('');
+  const [isLoading,           setIsLoading]           = useState(false);
+  // ✅ NEW: isTyping — jab tak latest bot message word-by-word chal raha hai
+  const [isTyping,            setIsTyping]            = useState(false);
+  const [isConfirming,        setIsConfirming]        = useState(false);
+  const [messageAnimations,   setMessageAnimations]   = useState({});
+  const [isFullScreen,        setIsFullScreen]        = useState(false);
+  const [isInitialized,       setIsInitialized]       = useState(false);
+  const [autoClickInProgress, setAutoClickInProgress] = useState(false);
+  const [deviceInfo,          setDeviceInfo]          = useState({
+    isMobile: false, isTablet: false, isSmallScreen: false,
+    screenWidth: 1024, deviceType: 'desktop'
+  });
 
   // ── Website / Config State ────────────────────────────────────────
-  const [activeConfig,          setActiveConfig]          = useState(null);
-  const [websiteTitle,          setWebsiteTitle]          = useState('Support');
-  const [connectionStatus,      setConnectionStatus]      = useState('connecting');
-  const [isWebsiteActive,       setIsWebsiteActive]       = useState(false);
-  const [websiteStatus,         setWebsiteStatus]         = useState('checking');
-  const [suggestedPrompts,      setSuggestedPrompts]      = useState([]);
-  const [categories,            setCategories]            = useState([]);
-  const [systemPrompts,         setSystemPrompts]         = useState([]);
-  const [welcomeMessages,       setWelcomeMessages]       = useState([]);
-  const [aifuture,              setAifuture]              = useState([]);
-  const [aiPersonality,         setAiPersonality]         = useState({ tone: 'friendly', emojiLevel: 'moderate', detailLevel: 'balanced' });
-  const [parentWebsiteUrl,      setParentWebsiteUrl]      = useState('');
+  const [activeConfig,        setActiveConfig]        = useState(null);
+  const [websiteTitle,        setWebsiteTitle]        = useState('Support');
+  const [connectionStatus,    setConnectionStatus]    = useState('connecting');
+  const [isWebsiteActive,     setIsWebsiteActive]     = useState(false);
+  const [websiteStatus,       setWebsiteStatus]       = useState('checking');
+  const [suggestedPrompts,    setSuggestedPrompts]    = useState([]);
+  const [categories,          setCategories]          = useState([]);
+  const [systemPrompts,       setSystemPrompts]       = useState([]);
+  const [welcomeMessages,     setWelcomeMessages]     = useState([]);
+  const [aifuture,            setAifuture]            = useState([]);
+  const [aiPersonality,       setAiPersonality]       = useState({
+    tone: 'friendly', emojiLevel: 'moderate', detailLevel: 'balanced'
+  });
+  const [parentWebsiteUrl,    setParentWebsiteUrl]    = useState('');
 
   // ── Prompt Flow State ─────────────────────────────────────────────
-  const [currentPromptFlow,     setCurrentPromptFlow]     = useState(null);
-  const [collectedData,         setCollectedData]         = useState({});
-  const [transformedDataForAPI, setTransformedDataForAPI] = useState({});
-  const [currentChildOptions,   setCurrentChildOptions]   = useState([]);
-  const [pendingQuestions,      setPendingQuestions]      = useState([]);
-  const [selectedPromptName,    setSelectedPromptName]    = useState('');
-  const [storedSummaryList,     setStoredSummaryList]     = useState([]);
+  const [currentPromptFlow,       setCurrentPromptFlow]       = useState(null);
+  const [collectedData,           setCollectedData]           = useState({});
+  const [transformedDataForAPI,   setTransformedDataForAPI]   = useState({});
+  const [currentChildOptions,     setCurrentChildOptions]     = useState([]);
+  const [pendingQuestions,        setPendingQuestions]        = useState([]);
+  const [selectedPromptName,      setSelectedPromptName]      = useState('');
+  const [storedSummaryList,       setStoredSummaryList]       = useState([]);
   const [storedPromptsWithParams, setStoredPromptsWithParams] = useState([]);
-  const [storedUrls,            setStoredUrls]            = useState([]);
-  const [storedApiKeys,         setStoredApiKeys]         = useState([]);
-  const [recentTopics,          setRecentTopics]          = useState([]);
-  const [lastAIMessage,         setLastAIMessage]         = useState('');
+  const [storedUrls,              setStoredUrls]              = useState([]);
+  const [storedApiKeys,           setStoredApiKeys]           = useState([]);
+  const [recentTopics,            setRecentTopics]            = useState([]);
+  const [lastAIMessage,           setLastAIMessage]           = useState('');
   const [interestDetectionEnabled] = useState(true);
 
   // ── Session State ─────────────────────────────────────────────────
-  const [sessionId,          setSessionId]          = useState('');
-  const [conversationCount,  setConversationCount]  = useState(0);
-  const [lastActivity,       setLastActivity]       = useState(Date.now());
-  const [sessionStartTime,   setSessionStartTime]   = useState(Date.now());
-  const [isSaving,           setIsSaving]           = useState(false);
-  const [hasInitialSave,     setHasInitialSave]     = useState(false);
-  const [autoSaveEnabled]                           = useState(true);
+  const [sessionId,         setSessionId]         = useState('');
+  const [conversationCount, setConversationCount] = useState(0);
+  const [lastActivity,      setLastActivity]      = useState(Date.now());
+  const [sessionStartTime,  setSessionStartTime]  = useState(Date.now());
+  const [isSaving,          setIsSaving]          = useState(false);
+  const [hasInitialSave,    setHasInitialSave]    = useState(false);
+  const [autoSaveEnabled]                         = useState(true);
 
   // ── Refs ──────────────────────────────────────────────────────────
   const hasShownWelcome     = useRef(false);
@@ -84,17 +94,17 @@ const Chatwidget = ({
   const lastSavedMessageRef = useRef(null);
   const saveTimeoutRef      = useRef(null);
   const lastMessageCount    = useRef(0);
+  // ✅ NEW: pending suggestions — typing complete hone ke baad set hongi
+  const pendingSuggestionsRef = useRef([]);
 
   // ── Branding ──────────────────────────────────────────────────────
-  const resolvedHeaderColor   = headerColor   || secondaryColor;
-  const resolvedPoweredByText = poweredByTextProp || 'JDPC Global';
-  const resolvedPoweredByUrl  = poweredByUrlProp  || 'https://jdpcglobal.com';
+  const resolvedHeaderColor   = headerColor        || secondaryColor;
+  const resolvedPoweredByText = poweredByTextProp  || 'JDPC Global';
+  const resolvedPoweredByUrl  = poweredByUrlProp   || 'https://jdpcglobal.com';
 
   useEffect(() => { activeConfigRef.current = activeConfig; }, [activeConfig]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Screen size & parent communication
-  // ─────────────────────────────────────────────────────────────────
+  // ── Screen size & parent communication ───────────────────────────
   const handleScreenSize = () => {
     const info = checkScreenSize();
     setDeviceInfo(info);
@@ -110,19 +120,14 @@ const Chatwidget = ({
 
   useEffect(() => {
     setupParentCommunication({
-      setParentWebsiteUrl,
-      setDeviceInfo,
-      setIsFullScreen,
-      setIsInitialized,
-      checkScreenSize: handleScreenSize,
+      setParentWebsiteUrl, setDeviceInfo, setIsFullScreen,
+      setIsInitialized, checkScreenSize: handleScreenSize,
     });
   }, []);
 
   const responsiveStyles = getResponsiveStyles(isInitialized, isFullScreen, {}, chatWindowSize);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Session initialization & reload detection
-  // ─────────────────────────────────────────────────────────────────
+  // ── Session initialization ────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -158,13 +163,15 @@ const Chatwidget = ({
     }
 
     const activityHandler = () => setLastActivity(Date.now());
-    ['click', 'keypress', 'scroll', 'mousemove'].forEach(e => window.addEventListener(e, activityHandler));
-    return () => ['click', 'keypress', 'scroll', 'mousemove'].forEach(e => window.removeEventListener(e, activityHandler));
+    ['click', 'keypress', 'scroll', 'mousemove'].forEach(e =>
+      window.addEventListener(e, activityHandler)
+    );
+    return () => ['click', 'keypress', 'scroll', 'mousemove'].forEach(e =>
+      window.removeEventListener(e, activityHandler)
+    );
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Long inactivity → new thread
-  // ─────────────────────────────────────────────────────────────────
+  // ── Long inactivity → new thread ─────────────────────────────────
   useEffect(() => {
     const LONG_TIME_THRESHOLD = 30 * 60 * 1000;
     const interval = setInterval(() => {
@@ -182,9 +189,7 @@ const Chatwidget = ({
     return () => clearInterval(interval);
   }, [lastActivity, conversationCount]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Auto-save
-  // ─────────────────────────────────────────────────────────────────
+  // ── Auto-save ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!autoSaveEnabled || messages.length === 0 || !sessionId || !activeConfig?.id || isSaving) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -202,25 +207,16 @@ const Chatwidget = ({
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [messages, sessionId, activeConfig, autoSaveEnabled, isSaving, hasInitialSave]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Message animation tracking
-  // ─────────────────────────────────────────────────────────────────
+  // ── Message tracking — last AI message update ─────────────────────
   useEffect(() => {
-    if (messages.length > lastMessageCount.current) setTimeout(() => {}, 100);
     lastMessageCount.current = messages.length;
-
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.sender === 'support-bot') {
-      const id = Date.now();
-      setMessageAnimations(prev => ({ ...prev, [id]: 'typing' }));
-      setTimeout(() => setMessageAnimations(prev => ({ ...prev, [id]: 'visible' })), Math.min(lastMessage.message.length * 30, 1500));
       setLastAIMessage(lastMessage.message);
     }
   }, [messages]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Helpers
-  // ─────────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────
   const resetPromptState = () => {
     setMessages([]);
     setCurrentPromptFlow(null);
@@ -228,19 +224,27 @@ const Chatwidget = ({
     setTransformedDataForAPI({});
     setCurrentChildOptions([]);
     setHasInitialSave(false);
-    lastSavedMessageRef.current = null;
-    hasShownWelcome.current     = false;
-    welcomeShownRef.current     = false;
+    setIsTyping(false);
+    pendingSuggestionsRef.current = [];
+    lastSavedMessageRef.current   = null;
+    hasShownWelcome.current       = false;
+    welcomeShownRef.current       = false;
   };
 
   const addBotMessage = (text, extra = {}) => {
-    const msg = { id: uuidv4(), sender: 'support-bot', message: text, createdAt: new Date().toISOString(), isAdmin: true, ...extra };
+    const msg = {
+      id: uuidv4(), sender: 'support-bot', message: text,
+      createdAt: new Date().toISOString(), isAdmin: true, ...extra
+    };
     setMessages(prev => [...prev, msg]);
     return msg;
   };
 
   const addUserMessage = (text) => {
-    const msg = { id: uuidv4(), sender: 'user', message: text, createdAt: new Date().toISOString(), isAdmin: false };
+    const msg = {
+      id: uuidv4(), sender: 'user', message: text,
+      createdAt: new Date().toISOString(), isAdmin: false
+    };
     setMessages(prev => [...prev, msg]);
     return msg;
   };
@@ -252,16 +256,18 @@ const Chatwidget = ({
   const shouldForceNewThread = () =>
     localStorage.getItem('force_new_thread') === 'true' || threadResetRef.current;
 
-  // ─────────────────────────────────────────────────────────────────
-  // Save helpers
-  // ─────────────────────────────────────────────────────────────────
+  // ── Save helpers ──────────────────────────────────────────────────
   const saveSingleMessage = async (role, text) => {
     if (!sessionId || text === 'Saving your request...') return;
 
-    const messageKey   = `${role}_${text}_${sessionId}`;
-    const now          = Date.now();
-    const lastKey      = localStorage.getItem(`last_saved_key_${sessionId}`);
-    const lastTime     = parseInt(localStorage.getItem(`last_saved_time_${sessionId}`) || '0');
+    // ✅ Text truncate — DynamoDB size limit fix
+    const MAX_LEN  = 800;
+    const safeText = text.length > MAX_LEN ? text.substring(0, MAX_LEN) + '...' : text;
+
+    const messageKey = `${role}_${safeText.substring(0, 50)}_${sessionId}`;
+    const now        = Date.now();
+    const lastKey    = localStorage.getItem(`last_saved_key_${sessionId}`);
+    const lastTime   = parseInt(localStorage.getItem(`last_saved_time_${sessionId}`) || '0');
     if (lastKey === messageKey && (now - lastTime) < 3000) return;
 
     try {
@@ -272,9 +278,13 @@ const Chatwidget = ({
       const forceNew = role === 'user' && shouldForceNewThread();
 
       const response = await fetch(endpoint, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, tokens: Math.ceil(text.length / 4), forceNewThread: forceNew }),
+        body:    JSON.stringify({
+          text:           safeText,
+          tokens:         Math.ceil(safeText.length / 4),
+          forceNewThread: forceNew
+        }),
       });
 
       const data = await response.json();
@@ -289,7 +299,7 @@ const Chatwidget = ({
       }
       return { success: response.ok, data };
     } catch (err) {
-      console.error('❌ Message save error:', err);
+      console.error('Message save error:', err);
       return { success: false };
     }
   };
@@ -308,10 +318,15 @@ const Chatwidget = ({
       let current   = null;
       newMessages.forEach(msg => {
         if (msg.sender === 'user') {
-          current = { userMessage: { text: msg.message, tokens: Math.ceil(msg.message.length / 4) }, botReplies: [] };
+          current = {
+            userMessage: { text: msg.message, tokens: Math.ceil(msg.message.length / 4) },
+            botReplies:  []
+          };
           threads.push(current);
         } else if (msg.sender === 'support-bot' && current && !msg._isTemp) {
-          current.botReplies.push({ text: msg.message, tokens: Math.ceil(msg.message.length / 4) });
+          current.botReplies.push({
+            text: msg.message, tokens: Math.ceil(msg.message.length / 4)
+          });
         }
       });
       if (threads.length === 0) return;
@@ -328,18 +343,20 @@ const Chatwidget = ({
         }
       }
     } catch (err) {
-      console.error('❌ Auto-save error:', err);
+      console.error('Auto-save error:', err);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // Chat initialization
-  // ─────────────────────────────────────────────────────────────────
+  // ── Chat initialization ───────────────────────────────────────────
   const showWelcomeMessage = (backendWelcomeMsgs, websiteData) => {
     if (hasShownWelcome.current || welcomeShownRef.current) return;
-    const text = cleanText(generateWelcomeMessage(websiteData.websiteName, backendWelcomeMsgs, websiteData.systemPrompt?.map(p => p.content)));
+    const text = cleanText(generateWelcomeMessage(
+      websiteData.websiteName,
+      backendWelcomeMsgs,
+      websiteData.systemPrompt?.map(p => p.content)
+    ));
     addBotMessage(text);
     hasShownWelcome.current = true;
     welcomeShownRef.current = true;
@@ -373,11 +390,9 @@ const Chatwidget = ({
         setActiveConfig(websiteData);
         setCategories(websiteData.category || []);
         setSystemPrompts(websiteData.systemPrompt || []);
-        if (websiteData.aifuture)     setAifuture(websiteData.aifuture);
+        if (websiteData.aifuture)      setAifuture(websiteData.aifuture);
         if (websiteData.aiPersonality) setAiPersonality(websiteData.aiPersonality);
         if (websiteData.customPrompt?.length > 0) setSuggestedPrompts(websiteData.customPrompt);
-        if (websiteData.systemPrompt?.length > 0)
-          setSuggestedPrompts(prev => [...prev, ...websiteData.systemPrompt.map(p => p.content).filter(Boolean)]);
 
         const backendWelcomeMsgs = await fetchWelcomeMessages(apiBaseUrl, backendApiKey, databaseConfig.websiteId);
         setWelcomeMessages(backendWelcomeMsgs);
@@ -386,13 +401,10 @@ const Chatwidget = ({
         showWelcomeMessage([], databaseConfig);
       }
     };
-
     initializeChat();
   }, [apiBaseUrl, backendApiKey]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Connection polling
-  // ─────────────────────────────────────────────────────────────────
+  // ── Connection polling ────────────────────────────────────────────
   useEffect(() => {
     if (!isWebsiteActive || websiteStatus === 'inactive') return;
     const poll = async () => {
@@ -416,26 +428,48 @@ const Chatwidget = ({
     return false;
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // Prompt flow logic
-  // ─────────────────────────────────────────────────────────────────
+  // ── addBotAndSave — bot message add karo + save karo ─────────────
   const addBotAndSave = async (text, extra = {}) => {
     addBotMessage(text, extra);
     await saveSingleMessage('support-bot', text);
   };
 
+  // ✅ NEW: Typing done callback
+  // Jab latest bot message ki typing complete ho:
+  // 1. isTyping false karo
+  // 2. pending suggestions set karo
+  const handleLatestMessageTypingDone = () => {
+    setIsTyping(false);
+    if (pendingSuggestionsRef.current.length > 0) {
+      setSuggestedPrompts(pendingSuggestionsRef.current);
+      pendingSuggestionsRef.current = [];
+    }
+  };
+
+  // ── Prompt flow logic ─────────────────────────────────────────────
   const completePromptFlow = (data) => {
     if (!isWebsiteActive) { handleInactiveInteraction(); return; }
     const transformed = transformDataWithParams(data, storedPromptsWithParams);
     setCollectedData(data);
     setTransformedDataForAPI(transformed);
-    addBotAndSave(createClientSummary(data));
+
+    const clientSummary = createClientSummary(data);
+    addBotAndSave(clientSummary);
+
+    // Summary typing estimate
+    const wordCount   = clientSummary.split(/\s+/).length;
+    const typingDelay = Math.max(1500, wordCount * 75 + 500);
+
     setTimeout(async () => {
       const confirmMsg = 'All done! Would you like to confirm this request?';
       await addBotAndSave(confirmMsg);
-      setIsConfirming(true);
       setCurrentPromptFlow(null);
-    }, 1000);
+
+      // "All done!" typing estimate, phir Yes/No
+      const confirmWordCount = confirmMsg.split(/\s+/).length;
+      const confirmDelay     = Math.max(800, confirmWordCount * 75 + 400);
+      setTimeout(() => { setIsConfirming(true); }, confirmDelay);
+    }, typingDelay);
   };
 
   const handleConfirmResponse = async (answer) => {
@@ -447,33 +481,46 @@ const Chatwidget = ({
     try {
       if (answer === 'Yes') {
         addBotMessage('Saving your request...', { _isTemp: true });
-        const serverSummary  = createServerSummary(collectedData, storedPromptsWithParams);
+        const serverSummary   = createServerSummary(collectedData, storedPromptsWithParams);
         const summaryParamKey = findSummaryParamKey(storedSummaryList);
 
         const formData = new FormData();
         formData.append('websiteId',  activeConfig.websiteId || activeConfig.id);
         formData.append('promptName', selectedPromptName);
-        Object.entries(transformedDataForAPI).forEach(([k, v]) => { if (v != null) formData.append(k, v); });
+        Object.entries(transformedDataForAPI).forEach(([k, v]) => {
+          if (v != null) formData.append(k, v);
+        });
         if (summaryParamKey) formData.append(summaryParamKey, serverSummary);
 
-        const execResult   = await (await fetch(`${apiBaseUrl}/api/execute-urls`, { method: 'POST', body: formData })).json();
-        const saveResult   = await (await fetch(`${apiBaseUrl}/api/chat-requests`, {
-          method: 'POST',
+        const execResult = await (await fetch(`${apiBaseUrl}/api/execute-urls`, {
+          method: 'POST', body: formData
+        })).json();
+
+        const saveResult = await (await fetch(`${apiBaseUrl}/api/chat-requests`, {
+          method:  'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${backendApiKey}` },
-          body:   JSON.stringify({ websiteId: activeConfig?.id, collectedData: transformedDataForAPI, backendApiKey, urlCallResults: execResult.results?.length > 0 ? execResult.results : undefined }),
+          body:    JSON.stringify({
+            websiteId:      activeConfig?.id,
+            collectedData:  transformedDataForAPI,
+            backendApiKey,
+            urlCallResults: execResult.results?.length > 0 ? execResult.results : undefined
+          }),
         })).json();
 
         if (saveResult.success) {
           setMessages(prev => prev.filter(msg => !msg._isTemp));
           await addBotAndSave(getSuccessMessage());
+          // After Yes — show all prompts again
+          setTimeout(() => setSuggestedPrompts(suggestedPrompts), 800);
         } else { throw new Error(saveResult.message || 'Failed to save request'); }
       } else {
         await fetch(`${apiBaseUrl}/api/chat-requests`, {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${backendApiKey}` },
-          body:   JSON.stringify({ websiteId: activeConfig?.id, collectedData: transformedDataForAPI }),
+          body:    JSON.stringify({ websiteId: activeConfig?.id, collectedData: transformedDataForAPI }),
         });
         await addBotAndSave(getCancelMessage());
+        setTimeout(() => setSuggestedPrompts(suggestedPrompts), 800);
       }
     } catch (error) {
       console.error('handleConfirmResponse error:', error);
@@ -482,7 +529,8 @@ const Chatwidget = ({
     } finally {
       setCollectedData({}); setTransformedDataForAPI({});
       setCurrentPromptFlow(null);
-      setStoredUrls([]); setStoredApiKeys([]); setStoredPromptsWithParams([]); setStoredSummaryList([]); setRecentTopics([]);
+      setStoredUrls([]); setStoredApiKeys([]);
+      setStoredPromptsWithParams([]); setStoredSummaryList([]); setRecentTopics([]);
     }
   };
 
@@ -510,14 +558,26 @@ const Chatwidget = ({
     const nextPrompt = prompts[promptIndex];
     if (nextPrompt.children?.length === 1) {
       const sc = nextPrompt.children[0];
-      setCurrentPromptFlow({ prompts, promptIndex, questionIndex: 0, currentQuestion: sc, waitingForOption: false, childOptions: null, ...flowMeta, isSingleChild: true });
+      setCurrentPromptFlow({
+        prompts, promptIndex, questionIndex: 0,
+        currentQuestion: sc, waitingForOption: false,
+        childOptions: null, ...flowMeta, isSingleChild: true
+      });
       await addBotAndSave(makeFriendly(sc.text));
     } else if (nextPrompt.children?.length > 1) {
-      setCurrentPromptFlow({ prompts, promptIndex, questionIndex: 0, currentQuestion: nextPrompt, waitingForOption: false, childOptions: nextPrompt.children, ...flowMeta, isSingleChild: false });
+      setCurrentPromptFlow({
+        prompts, promptIndex, questionIndex: 0,
+        currentQuestion: nextPrompt, waitingForOption: false,
+        childOptions: nextPrompt.children, ...flowMeta, isSingleChild: false
+      });
       await addBotAndSave(makeFriendly(nextPrompt.text));
       setTimeout(() => showOptionsAfterQuestion(nextPrompt.children, prompts, promptIndex), 1000);
     } else {
-      setCurrentPromptFlow({ prompts, promptIndex, questionIndex: 0, currentQuestion: nextPrompt, waitingForOption: false, childOptions: null, ...flowMeta, isSingleChild: false });
+      setCurrentPromptFlow({
+        prompts, promptIndex, questionIndex: 0,
+        currentQuestion: nextPrompt, waitingForOption: false,
+        childOptions: null, ...flowMeta, isSingleChild: false
+      });
       await addBotAndSave(makeFriendly(nextPrompt.text));
     }
   };
@@ -555,10 +615,15 @@ const Chatwidget = ({
   const showOptionsAfterQuestion = async (children, prompts, promptIndex) => {
     if (children.length > 1) {
       setCurrentChildOptions(children.map(c => c.text));
-      setCurrentPromptFlow(prev => ({ ...prev, waitingForOption: true, childOptions: children, currentQuestion: { text: 'Select Option' } }));
+      setCurrentPromptFlow(prev => ({
+        ...prev, waitingForOption: true, childOptions: children,
+        currentQuestion: { text: 'Select Option' }
+      }));
     } else if (children.length === 1) {
       const sc = children[0];
-      setCurrentPromptFlow(prev => ({ ...prev, waitingForOption: false, currentQuestion: sc, isSingleChild: true }));
+      setCurrentPromptFlow(prev => ({
+        ...prev, waitingForOption: false, currentQuestion: sc, isSingleChild: true
+      }));
       await addBotAndSave(makeFriendly(sc.text));
     }
   };
@@ -572,7 +637,8 @@ const Chatwidget = ({
       return;
     }
     const newData = { ...collectedData, [prompts[promptIndex].text]: optionText };
-    setCollectedData(newData); setCurrentChildOptions([]);
+    setCollectedData(newData);
+    setCurrentChildOptions([]);
 
     if (!messages[messages.length - 1]?.isOptions) {
       addUserMessage(optionText);
@@ -583,7 +649,9 @@ const Chatwidget = ({
     if (selectedOption.children?.length > 0) {
       if (selectedOption.children.length === 1) {
         const sc = selectedOption.children[0];
-        setCurrentPromptFlow(prev => ({ ...prev, waitingForOption: false, currentQuestion: sc, isSingleChild: true }));
+        setCurrentPromptFlow(prev => ({
+          ...prev, waitingForOption: false, currentQuestion: sc, isSingleChild: true
+        }));
         await addBotAndSave(makeFriendly(sc.text));
       } else {
         setTimeout(() => showOptionsAfterQuestion(selectedOption.children, prompts, promptIndex), 500);
@@ -595,9 +663,7 @@ const Chatwidget = ({
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // Prompt click
-  // ─────────────────────────────────────────────────────────────────
+  // ── Prompt click ──────────────────────────────────────────────────
   const findMatchingPrompt = (aiResponse) => {
     if (!aiResponse || !suggestedPrompts.length) return null;
     const responseLower = aiResponse.toLowerCase();
@@ -618,7 +684,14 @@ const Chatwidget = ({
 
   const handlePromptClick = async (promptName) => {
     if (!isWebsiteActive) { handleInactiveInteraction(); return; }
-    setAutoClickInProgress(false); setIsLoading(true);
+
+    // ✅ Suggestions turant clear karo
+    setSuggestedPrompts([]);
+    pendingSuggestionsRef.current = [];
+    setAutoClickInProgress(false);
+    setIsLoading(true);
+    setIsTyping(false);
+
     try {
       const data = await fetchChildPrompts(apiBaseUrl, backendApiKey, activeConfig?.id, promptName);
       setSelectedPromptName(promptName);
@@ -629,23 +702,44 @@ const Chatwidget = ({
 
       addUserMessage(promptName);
       await saveSingleMessage('user', promptName);
+
+      // ✅ 600ms baad intro dikhao
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      setIsLoading(false);
+      setIsTyping(true);
       await addBotAndSave(getPromptIntroMessage(promptName));
+
+      // Intro typing estimate
+      const introMsg       = getPromptIntroMessage(promptName);
+      const introWordCount = introMsg.split(/\s+/).length;
+      const introWait      = Math.max(800, introWordCount * 75 + 400);
+      await new Promise(resolve => setTimeout(resolve, introWait));
+      setIsTyping(false);
 
       const flowMeta = { promptName };
       if (prompts.length > 0) {
         await buildNextPromptFlow(prompts, 0, flowMeta);
       } else {
-        await addBotAndSave(`I'd be happy to help you with ${promptName}! Please tell me your requirements and I'll assist you.`);
+        await addBotAndSave(
+          `I'd be happy to help you with ${promptName}! Please tell me your requirements and I'll assist you.`
+        );
         setCurrentPromptFlow(null);
       }
     } catch (err) {
       console.error('Prompt Click Error:', err);
       addUserMessage(promptName);
       await saveSingleMessage('user', promptName);
-      await addBotAndSave(`I'd love to help with ${promptName}! Please share what you need, and I'll do my best to assist!`);
+      await addBotAndSave(
+        `I'd love to help with ${promptName}! Please share what you need, and I'll do my best to assist!`
+      );
       setCurrentPromptFlow(null);
     } finally {
-      setTimeout(() => { setAutoClickInProgress(false); setIsLoading(false); }, 2000);
+      setIsLoading(false);
+      setIsTyping(false);
+      setAutoClickInProgress(false);
+      setSuggestedPrompts([]);
+      pendingSuggestionsRef.current = [];
     }
   };
 
@@ -663,17 +757,20 @@ const Chatwidget = ({
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // Main send handler
-  // ─────────────────────────────────────────────────────────────────
+  // ── Main send handler ─────────────────────────────────────────────
   const handleSendMessage = async (text) => {
-    if (!text.trim() || isLoading) return;
+    // ✅ isTyping ke dauran bhi block karo
+    if (!text.trim() || isLoading || isTyping) return;
     if (!isWebsiteActive) { handleInactiveInteraction(); return; }
     setLastActivity(Date.now());
 
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.sender === 'user' && lastMessage.message === text &&
         Math.abs(new Date() - new Date(lastMessage.createdAt)) < 3000) return;
+
+    // ✅ Purani suggestions clear karo
+    setSuggestedPrompts([]);
+    pendingSuggestionsRef.current = [];
 
     addUserMessage(text);
     setInputMessage('');
@@ -683,31 +780,56 @@ const Chatwidget = ({
     if (currentPromptFlow?.currentQuestion)          { handlePromptFlowResponse(text); return; }
     if (pendingQuestions.length > 0 || isConfirming) { setTimeout(() => handleNextQuestion(text), 800); return; }
 
-    // Email validation mid-conversation
-    const lastBotMessage = messages.slice().reverse().find(m => m.sender === 'support-bot' && m.isAdmin);
-    if (lastBotMessage && (lastBotMessage.message.includes('email address') || lastBotMessage.message.includes('Please provide your email'))) {
+    const lastBotMessage = messages.slice().reverse().find(
+      m => m.sender === 'support-bot' && m.isAdmin
+    );
+    const isEmailRequest = lastBotMessage && (
+      lastBotMessage.message.includes('email address') ||
+      lastBotMessage.message.includes('Please provide your email')
+    );
+
+    if (isEmailRequest) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim())) {
-        await addBotAndSave('Please provide a valid email address (e.g., name@example.com)', { isError: true });
+        await addBotAndSave(
+          'Please provide a valid email address (e.g., name@example.com)', { isError: true }
+        );
         return;
       }
       setIsLoading(true);
       try {
         const allAI  = messages.filter(m => m.sender === 'support-bot' && m.isAdmin);
         const result = await (await fetch(`${apiBaseUrl}/api/chat-requests`, {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${backendApiKey}` },
-          body:   JSON.stringify({ websiteId: activeConfig?.id, collectedData: { email: text.trim(), lastMessage: allAI[allAI.length - 1]?.message || '', secondLastMessage: allAI[allAI.length - 2]?.message || '' }, backendApiKey }),
+          body:    JSON.stringify({
+            websiteId:     activeConfig?.id,
+            collectedData: {
+              email:             text.trim(),
+              lastMessage:       allAI[allAI.length - 1]?.message || '',
+              secondLastMessage: allAI[allAI.length - 2]?.message || ''
+            },
+            backendApiKey
+          }),
         })).json();
-        if (result.success) await addBotAndSave('Thank you! Your email has been saved. Our team will contact you shortly.');
-        else throw new Error(result.message);
+        if (result.success) {
+          await addBotAndSave(
+            'Thank you! Your email has been saved. Our team will contact you shortly.'
+          );
+        } else { throw new Error(result.message); }
       } catch {
-        await addBotAndSave('Sorry, there was an error saving your email. Please try again.', { isError: true });
+        await addBotAndSave(
+          'Sorry, there was an error saving your email. Please try again.', { isError: true }
+        );
       } finally { setIsLoading(false); }
       return;
     }
 
     if (checkUserNotInterest(text)) {
-      setTimeout(async () => await addBotAndSave('No problem! If you have any other questions, feel free to ask. How else can I help you?'), 500);
+      setTimeout(async () => {
+        await addBotAndSave(
+          'No problem! If you have any other questions, feel free to ask. How else can I help you?'
+        );
+      }, 500);
       return;
     }
 
@@ -720,40 +842,78 @@ const Chatwidget = ({
         return;
       }
       if (!matching) {
-        setIsLoading(true);
         const topic    = extractMainTopic(lastAIMessage);
-        const emailMsg = topic ? `Please provide your email address, we will get you in touch regarding "${topic}"` : 'Please provide your email address, we will get you in touch regarding this';
+        const emailMsg = topic
+          ? `Please provide your email address, we will get you in touch regarding "${topic}"`
+          : 'Please provide your email address, we will get you in touch regarding this';
         await addBotAndSave(emailMsg);
-        setIsLoading(false);
         return;
       }
     }
 
+    // ✅ FLOW:
+    // 1. isLoading = true  → three dots show
+    // 2. Response aaya     → isLoading = false, isTyping = true → word-by-word start
+    // 3. Typing done       → isTyping = false, suggestions set
     setIsLoading(true);
-    const { response } = await generateAIResponse(apiBaseUrl, backendApiKey, text);
-    const cleaned      = cleanText(response);
-    const lastBot      = messages[messages.length - 1];
-    if (lastBot?.sender === 'support-bot' && lastBot.message === cleaned) { setIsLoading(false); return; }
-    await addBotAndSave(cleaned);
-    setLastAIMessage(cleaned);
-    setIsLoading(false);
+    try {
+      const { response, suggestions } = await generateAIResponse(apiBaseUrl, backendApiKey, text);
+      const cleaned = cleanText(response);
+
+      const lastBot = messages[messages.length - 1];
+      if (lastBot?.sender === 'support-bot' && lastBot.message === cleaned) {
+        setIsLoading(false);
+        return;
+      }
+
+      // ✅ Three dots hatao, typing shuru karo
+      setIsLoading(false);
+      setIsTyping(true);
+
+      // Agar suggestions hain to pending mein rakho
+      if (suggestions && suggestions.length > 0 && !currentPromptFlow) {
+        pendingSuggestionsRef.current = suggestions;
+      } else {
+        pendingSuggestionsRef.current = [];
+      }
+
+      await addBotAndSave(cleaned);
+      // isTyping false aur suggestions set handleLatestMessageTypingDone mein honge
+
+    } catch (err) {
+      console.error('AI response error:', err);
+      setIsLoading(false);
+      setIsTyping(false);
+      pendingSuggestionsRef.current = [];
+      await addBotAndSave("I'm having trouble right now. Please try again.", { isError: true });
+    }
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // Close
-  // ─────────────────────────────────────────────────────────────────
+  // ── Close ─────────────────────────────────────────────────────────
   const handleCloseChat = () => {
     if (messages.length > 0 && !isSaving) saveCurrentConversation();
     sendCloseMessageToParent();
     resetPromptState();
-    setStoredUrls([]); setStoredApiKeys([]); setStoredPromptsWithParams([]); setRecentTopics([]); setAutoClickInProgress(false);
+    setStoredUrls([]); setStoredApiKeys([]); setStoredPromptsWithParams([]);
+    setRecentTopics([]); setAutoClickInProgress(false);
   };
 
-  const isInputDisabled = isLoading || isConfirming || !!currentPromptFlow?.waitingForOption || !isWebsiteActive || autoClickInProgress || isSaving;
+  // ✅ Input disable:
+  // - isLoading (three dots, API wait)
+  // - isTyping  (word-by-word chal raha hai)
+  // - isConfirming (Yes/No buttons)
+  // - waitingForOption
+  // - website inactive
+  // - autoClickInProgress
+  const isInputDisabled =
+    isLoading ||
+    isTyping  ||
+    isConfirming ||
+    !!currentPromptFlow?.waitingForOption ||
+    !isWebsiteActive ||
+    autoClickInProgress;
 
-  // ─────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <div className={styles.chatWidgetContainer} style={responsiveStyles.container}>
       <div className={styles.chatWidgetWindow} style={responsiveStyles.window}>
@@ -790,6 +950,8 @@ const Chatwidget = ({
           websiteStatus={websiteStatus}
           messageAnimations={messageAnimations}
           isFullScreen={isFullScreen}
+          // ✅ Typing done callback
+          onLatestMessageTypingDone={handleLatestMessageTypingDone}
         />
 
         <ChatInput
@@ -807,6 +969,7 @@ const Chatwidget = ({
         />
 
         {isFullScreen && <div className={styles.safeAreaBottom} />}
+
         {autoClickInProgress && (
           <div className={styles.autoClickIndicator}>
             <div className={styles.autoClickSpinner} />

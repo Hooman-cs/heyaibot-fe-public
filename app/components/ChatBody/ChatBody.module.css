@@ -1,186 +1,51 @@
 /* ChatBody.module.css */
 
 .chatBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  height: 100%;
-  overflow-y: visible;
-  overflow-x: hidden;
   background: url('/whatsapp-bg.png');
-  min-height: auto;
+  flex-direction: column;
+  scroll-behavior: smooth;
+  height: -webkit-fill-available;
+}
+
+.chatBody::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chatBody::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatBody::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.chatBody::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .messagesContainer {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  justify-content: flex-end;
+  min-height: auto;
 }
 
 .message {
-  max-width: 80%;
-  margin-bottom: 8px;
-  animation: fadeIn 0.3s ease;
-}
-
-.userMessage {
-  align-self: flex-end;
-}
-
-.botMessage {
-  align-self: flex-start;
-}
-
-.messageContent {
-  padding: 12px 16px;
-  border-radius: 18px;
-  position: relative;
-  word-wrap: break-word;
-}
-
-.userMessage .messageContent {
-  background-color: #4a6baf;
-  color: white;
-  border-bottom-right-radius: 4px;
-}
-
-.botMessage .messageContent {
-  background-color: white;
-  color: #333;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.messageText {
-  font-size: 14px;
-  line-height: 1.4;
-  white-space: pre-wrap;
-}
-
-.messageTime {
-  font-size: 10px;
-  opacity: 0.7;
-  margin-top: 4px;
-  text-align: right;
-}
-
-/* Typing indicator */
-.typingIndicator {
   display: flex;
-  gap: 4px;
-  padding: 12px 16px;
-  background-color: white;
-  border-radius: 18px;
-  border-bottom-left-radius: 4px;
-  align-self: flex-start;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  max-width: 100%;
+ 
+  animation: fadeInUp 0.2s ease-out;
 }
 
-.typingIndicator span {
-  width: 8px;
-  height: 8px;
-  background-color: #999;
-  border-radius: 50%;
-  animation: typing 1.4s infinite;
-}
-
-.typingIndicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typingIndicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-/* Confirm buttons */
-.confirmButtons {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 16px;
-}
-
-.confirmButton {
-  padding: 10px 24px;
-  border: none;
-  border-radius: 24px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.confirmButton:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-
-/* Options container */
-.optionsContainer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-  justify-content: center;
-}
-
-.optionButton {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background-color: white;
-}
-
-.optionButton:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-/* Suggested prompts */
-.suggestedPrompts {
-  margin-top: 16px;
-}
-
-.suggestedTitle {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.promptButtons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-}
-
-.promptButton {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background-color: white;
-}
-
-.promptButton:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-/* Animations */
-@keyframes fadeIn {
+@keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -188,49 +53,367 @@
   }
 }
 
-@keyframes typing {
+.userMessage {
+  justify-content: flex-end;
+}
+
+.botMessage {
+  justify-content: flex-start;
+}
+
+.messageContent {
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+}
+
+.userMessage .messageContent {
+  align-items: flex-end;
+}
+
+.botMessage .messageContent {
+  align-items: flex-start;
+}
+
+.messageText {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+  position: relative;
+}
+
+.userMessage .messageText {
+  background-color: var(--primary-color, #4a6baf);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.10);
+}
+
+.botMessage .messageText {
+  background-color: #f1f3f7;
+  color: #1a1a2e;
+  border-bottom-left-radius: 4px;
+   box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.10);
+}
+
+.messageTime {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 4px;
+  padding: 0 6px;
+  letter-spacing: 0.3px;
+}
+
+/* Typing cursor animation */
+.typingCursor {
+  display: inline-block;
+  width: 2px;
+  height: 15px;
+  background-color: currentColor;
+  margin-left: 2px;
+  vertical-align: middle;
+  border-radius: 1px;
+  animation: blink 0.8s step-end infinite;
+  
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Three dots loading indicator */
+.typingIndicator {
+  display: flex;
+  gap: 5px;
+  padding: 10px 14px;
+  background-color: #f1f3f7;
+  border-radius: 18px;
+  border-bottom-left-radius: 4px;
+  width: fit-content;
+  margin-left: 0;
+  margin-bottom: 8px;
+  align-items: center;
+  justify-content: center;
+
+}
+
+.typingIndicator span {
+  width: 8px;
+  height: 8px;
+  background-color: #9ca3af;
+  border-radius: 50%;
+  animation: bounce 1.3s infinite ease-in-out;
+}
+
+.typingIndicator span:nth-child(1) { animation-delay: 0s; }
+.typingIndicator span:nth-child(2) { animation-delay: 0.2s; }
+.typingIndicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
   0%, 60%, 100% {
     transform: translateY(0);
     opacity: 0.6;
   }
   30% {
-    transform: translateY(-5px);
+    transform: translateY(-8px);
     opacity: 1;
   }
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
+/* Confirm buttons section */
+.confirmButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  padding: 4px 0;
+  justify-content: flex-start;
+}
+
+.confirmButton {
+  padding: 8px 24px;
+  border-radius: 25px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #ffffff;
+  transition: all 0.2s ease;
+  min-width: 90px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.confirmButton:hover {
+  transform: scale(1.02);
+  opacity: 0.92;
+}
+
+.confirmButton:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Options container - responsive wrapping */
+.optionsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+ 
+  margin-bottom: 4px;
+  padding: 4px 0;
+}
+
+.optionButton {
+  padding: 7px 16px;
+  border-radius: 25px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: white;
+  border: 1.5px solid var(--primary-color, #4a6baf);
+  color: var(--primary-color, #4a6baf);
+  white-space: normal;
+  word-break: break-word;
+  max-width: 100%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
+}
+
+.optionButton:hover {
+  background-color: var(--primary-color, #4a6baf);
+  color: white;
+  transform: translateY(-1px);
+ box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+}
+
+.optionButton:active {
+  transform: translateY(0);
+   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
+}
+
+/* Suggested prompts section - fully responsive */
+.suggestedPrompts {
+  margin-top: 12px;
+  margin-bottom: 4px;
+  padding: 4px 0;
+  width: 100%;
+}
+
+.promptButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.promptButton {
+  padding: 5px 10px;
+  border-radius: 25px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: white;
+  border: 1.5px solid var(--primary-color, #4a6baf);
+  color: var(--primary-color, #4a6baf);
+  white-space: normal;
+  word-break: break-word;
+  max-width: 100%;
+  flex: 0 1 auto;
+  line-height: 1.4;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
+}
+
+.promptButton:hover {
+  background-color: var(--primary-color, #4a6baf);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+}
+
+.promptButton:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
   .chatBody {
-    padding: 12px;
-    padding-bottom: 8px;
-  }
-  
-  .message {
-    max-width: 85%;
+    padding: 10px;
   }
   
   .messageContent {
-    padding: 10px 14px;
+    max-width: 90%;
   }
   
   .messageText {
+    padding: 8px 12px;
     font-size: 13px;
   }
+  
+  .confirmButton {
+    padding: 7px 20px;
+    min-width: 80px;
+    font-size: 12.5px;
+  }
+  
+  .optionButton {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+  
+  .promptButton {
+    padding: 5px 12px;
+    font-size: 11.5px;
+  }
+  
+  .typingIndicator {
+    padding: 8px 12px;
+  }
+  
+  .typingIndicator span {
+    width: 7px;
+    height: 7px;
+  }
 }
-/* ─── Paste this into your ChatBody.module.css ─── */
 
-/* Blinking cursor shown during typewriter animation */
-.typingCursor {
-  display: inline-block;
-  margin-left: 1px;
-  font-weight: 300;
-  color: inherit;
-  opacity: 1;
-  animation: cursorBlink 0.6s step-end infinite;
+/* Tablet optimizations */
+@media (min-width: 481px) and (max-width: 768px) {
+  .chatBody {
+    padding: 12px;
+  }
+  
+  .messageContent {
+    max-width: 80%;
+  }
+  
+  .optionButton, .promptButton {
+    padding: 7px 16px;
+    font-size: 12.5px;
+  }
 }
 
-@keyframes cursorBlink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  .chatBody {
+    background-color: #1a1a2e;
+  }
+  
+  .botMessage .messageText {
+    background-color: #2d2d44;
+    color: #e2e8f0;
+  }
+  
+  .typingIndicator {
+    background-color: #2d2d44;
+  }
+  
+  .typingIndicator span {
+    background-color: #64748b;
+  }
+  
+  .optionButton, .promptButton {
+    background-color: #1e1e2f;
+    border-color: var(--primary-color, #4a6baf);
+    color: var(--primary-color, #4a6baf);
+  }
+  
+  .optionButton:hover, .promptButton:hover {
+    background-color: var(--primary-color, #4a6baf);
+    color: #ffffff;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .message {
+    animation: none;
+  }
+  
+  .typingCursor {
+    animation: none;
+    opacity: 1;
+  }
+  
+  .typingIndicator span {
+    animation: none;
+    opacity: 0.6;
+  }
+  
+  .optionButton:hover, .promptButton:hover, .confirmButton:hover {
+    transform: none;
+  }
+}
+
+/* Ensure buttons don't overflow on very small screens */
+@media (max-width: 360px) {
+  .confirmButton {
+    padding: 6px 16px;
+    min-width: 70px;
+    font-size: 12px;
+  }
+  
+  .optionButton, .promptButton {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  
+  .promptButtons {
+    gap: 6px;
+  }
+  
+  .optionsContainer {
+    gap: 6px;
+  }
 }

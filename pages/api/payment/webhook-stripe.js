@@ -93,22 +93,34 @@ export default async function handler(req, res) {
     // ==========================================
     // 2. HANDLE CANCELLATIONS
     // ==========================================
-    if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.canceled") {
+    // if (event.type === "customer.subscription.deleted") {
+    //   const subEntity = event.data.object;
+    //   const dbSub = await getSubscriptionByOrderId(subEntity.id);
+
+    //   if (dbSub) {
+    //     // Mark subscription as Expired in the ledger
+    //     await docClient.send(new UpdateCommand({
+    //       TableName: "Subscriptions",
+    //       Key: { payment_id: dbSub.payment_id },
+    //       UpdateExpression: "set #st = :exp",
+    //       ExpressionAttributeNames: { "#st": "status" },
+    //       ExpressionAttributeValues: { ":exp": "Expired" }
+    //     }));
+
+    //     // Remove plan access from the user's main profile
+    //     await updateUserPlan(dbSub.user_id, "none");
+    //     console.log(`🚫 Cancelled Stripe subscription for User: ${dbSub.user_id}`);
+    //   }
+    // }
+    if (event.type === "customer.subscription.deleted") {
       const subEntity = event.data.object;
       const dbSub = await getSubscriptionByOrderId(subEntity.id);
 
       if (dbSub) {
-        // Mark subscription as Expired in the ledger
-        await docClient.send(new UpdateCommand({
-          TableName: "Subscriptions",
-          Key: { payment_id: dbSub.payment_id },
-          UpdateExpression: "set #st = :exp",
-          ExpressionAttributeNames: { "#st": "status" },
-          ExpressionAttributeValues: { ":exp": "Expired" }
-        }));
-
-        // Remove plan access from the user's main profile
-        await updateUserPlan(dbSub.user_id, "none");
+        // OPTIMIZATION: Use the new shared utility
+        const { markSubscriptionExpired } = await import('../../../app/model/subscription-db');
+        await markSubscriptionExpired(dbSub.payment_id, dbSub.user_id);
+        
         console.log(`🚫 Cancelled Stripe subscription for User: ${dbSub.user_id}`);
       }
     }

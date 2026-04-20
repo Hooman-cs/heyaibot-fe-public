@@ -1,22 +1,33 @@
-/* APISettingsPopup.module.css */
-/* APISettingsPopup.module.css */
+/* ============================================================
+   APISettingsPopup.module.css  —  Admin Theme Matched
+   Dark background with Purple #6366f1/#8b5cf6 accents
+   Header: #667eea→#764ba2 gradient (matches admin header)
+   ============================================================ */
 
+/* ── OVERLAY ── */
 .overlay {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  background: rgba(0, 0, 0, 0.9) !important;
+  background:  #f0f0f0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  z-index: 9999999999 !important; /* CustomPromptPopup (999999999) se zyada */
-  animation: fadeIn 0.3s ease;
+  z-index: 9999999999 !important;
+  animation: fadeIn 0.25s ease;
   isolation: isolate !important;
   pointer-events: auto !important;
+  backdrop-filter: blur(6px) !important;
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── POPUP SHELL — dark, matches UseApiPopup dark card ── */
 .popup {
   background: linear-gradient(135deg, #0a0e17 0%, #151a28 100%);
   border-radius: 20px;
@@ -25,975 +36,101 @@
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 
-    0 25px 50px -12px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
   overflow: hidden;
   color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   position: relative !important;
-  z-index: 10000000000 !important; /* Overlay se bhi uper */
+  z-index: 10000000000 !important;
   transform: translate3d(0, 0, 0) !important;
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Dropdown menus and other floating elements inside popup */
-.dropdownMenu, 
-.tooltip,
-.modalContent {
-  z-index: 10000000001 !important; /* Popup se bhi uper */
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.92) translateY(16px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-
-
+/* ── HEADER — Purple gradient (same as admin header) ── */
 .header {
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.02);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px 26px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-
+  flex-shrink: 0;
+  box-shadow: 0 2px 16px rgba(102, 126, 234, 0.3);
 }
 
 .headerMain {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .headerIcon {
-  color: #6366f1;
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   padding: 10px;
   border-radius: 10px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .header h2 {
-  margin: 0;
-  font-size: 22px;
+  margin: 0 0 5px 0;
+  font-size: 1.3rem;
   font-weight: 700;
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.5px;
+  color: white;
+  letter-spacing: -0.3px;
 }
 
 .header p {
-  margin: 6px 0 0 0;
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 400;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.8rem;
 }
 
 .closeButton {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 8px;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.closeButton:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.2);
-  transform: rotate(90deg);
-}
-
-.content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0;
-}
-
-/* API Configuration Section */
-.apiConfigSection {
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.01);
-}
-
-.sectionTitle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #f1f5f9;
-}
-
-.sectionTitle svg {
-  color: #6366f1;
-}
-
-.apiConfigGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.configInputGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.inputLabel {
-  font-size: 13px;
-  font-weight: 500;
-  color: #cbd5e1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.inputLabel svg {
-  color: #94a3b8;
-}
-
-.urlInput {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 14px 16px;
-  color: #f1f5f9;
-  font-size: 14px;
-  transition: all 0.3s;
-  outline: none;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
-}
-
-.urlInput:focus {
-  border-color: #6366f1;
-  box-shadow: 
-    0 0 0 3px rgba(99, 102, 241, 0.15),
-    0 4px 20px rgba(99, 102, 241, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.urlInput::placeholder {
-  color: #64748b;
-}
-
-.apiKeyWrapper {
-  position: relative;
-}
-
-.apiKeyInput {
-  width:-webkit-fill-available;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 14px 16px;
-  padding-right: 48px;
-  color: #f1f5f9;
-  font-size: 14px;
-  transition: all 0.3s;
-  outline: none;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
-  letter-spacing: 0.5px;
-  
-}
-
-.apiKeyInput:focus {
-  border-color: #6366f1;
-  box-shadow: 
-    0 0 0 3px rgba(99, 102, 241, 0.15),
-    0 4px 20px rgba(99, 102, 241, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.eyeToggle {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #94a3b8;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.eyeToggle:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #f1f5f9;
-}
-
-/* Prompts Section */
-.promptsSection {
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.sectionHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-}
-
-.sectionSubtitle {
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 400;
-  margin-left: 6px;
-}
-
-.sectionStats {
-  display: flex;
-  gap: 12px;
-}
-
-.statItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.statItem svg {
-  color: #6366f1;
-}
-
-/* Empty State */
-.emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-  border: 2px dashed rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.emptyIllustration {
-  color: rgba(255, 255, 255, 0.08);
-  margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 20px;
-  border-radius: 50%;
-}
-
-.emptyState h3 {
-  margin: 0 0 8px 0;
-  color: #f1f5f9;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.emptyState p {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.6;
-  max-width: 300px;
-}
-
-/* Prompts Grid - 2 per row */
-.promptsGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.promptRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-
-}
-
-.promptCard {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 14px;
-  padding: 20px;
-  transition: all 0.3s;
-  animation: slideUp 0.4s ease;
-  display: flex;
-  flex-direction: column;
-
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.promptCard:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(99, 102, 241, 0.1);
-  transform: translateY(-2px);
-}
-
-.emptyPromptSlot {
-  background: rgba(255, 255, 255, 0.01);
-  border: 2px dashed rgba(255, 255, 255, 0.05);
-  border-radius: 14px;
-  min-height: 320px;
-  opacity: 0.5;
-}
-
-/* Prompt Header */
-.promptHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.promptMeta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.promptNumber {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 5px 12px;
-  border-radius: 16px;
-  min-width: 80px;
-  text-align: center;
-  letter-spacing: 0.5px;
-}
-
-.promptStatus {
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.hasParameter {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.15);
-  padding: 5px 10px;
-  border-radius: 16px;
-}
-
-.noParameter {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.15);
-  padding: 5px 10px;
-  border-radius: 16px;
-}
-
-
-
-
-
-/* Prompt Text */
-.promptTextContainer {
-  display: flex;
- gap: 5px;
-}
-
-.lockIcon {
-  color: #94a3b8;
-  margin-top: 2px;
+  cursor: pointer;
+  transition: all 0.25s ease;
   flex-shrink: 0;
 }
 
-.promptText {
+.closeButton:hover {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: rotate(90deg);
+}
+
+/* ── CONTENT AREA ── */
+.content {
   flex: 1;
-  color: #e2e8f0;
-  font-size: 13px;
-  line-height: 1.5;
-  word-break: break-word;
-  font-style: italic;
-  opacity: 0.9;
   overflow-y: auto;
-  padding-right: 8px;
-  max-height: 120px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.5) transparent;
 }
 
-.promptText::-webkit-scrollbar {
-  width: 4px;
-}
+.content::-webkit-scrollbar { width: 6px; }
+.content::-webkit-scrollbar-track { background: transparent; }
+.content::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.4); border-radius: 4px; }
+.content::-webkit-scrollbar-thumb:hover { background: rgba(102, 126, 234, 0.6); }
 
-.promptText::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.promptText::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-
-/* Parameter Section */
-.parameterSection {
-  margin-top: 12px;
-}
-
-.parameterCard {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 10px;
-  padding: 16px;
-  animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.parameterHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.paramIcon {
-  color: #6366f1;
-}
-
-.paramLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: #cbd5e1;
-}
-
-.parameterContent {
-  display: flex;
-  gap: 10px;
-}
-
-.parameterInput {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 10px 14px;
-  color: #f1f5f9;
-  font-size: 13px;
-  font-family: 'SF Mono', monospace;
-  outline: none;
-  transition: all 0.2s;
-}
-
-.parameterInput:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-}
-
-.deleteParamBtn {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  border-radius: 6px;
-  width: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ef4444;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.deleteParamBtn:hover {
-  background: rgba(239, 68, 68, 0.25);
-  transform: scale(1.05);
-}
-
-/* Add Parameter Section */
-.addParameterSection {
-  flex: 1;
-}
-
-.addParameterPrompt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-  border: 2px dashed rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-  text-align: center;
-  transition: all 0.3s;
-
-}
-
-.addParameterPrompt:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.addPromptIcon {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6366f1;
-  margin-bottom: 12px;
-}
-
-.addParamBtn {
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
-  border: none;
-  color: white;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s;
-  margin-bottom: 8px;
-}
-
-.addParamBtn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
-}
-
-.addPromptHint {
-  color: #94a3b8;
-  font-size: 11px;
-  margin: 0;
-  line-height: 1.4;
-}
-
-/* Add Parameter Form */
-.addParameterForm {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 10px;
-  padding: 16px;
-  height: 100%;
-  min-height: 140px;
-  display: flex;
-  flex-direction: column;
-}
-
-.formHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  color: #6366f1;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.formGroup {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.newParamInput {
-  width: -webkit-fill-available;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px 14px;
-  color: #f1f5f9;
-  font-size: 13px;
-  outline: none;
-  margin-bottom: 12px;
-  transition: all 0.2s;
-}
-
-.newParamInput:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-}
-
-.formActions {
-  display: flex;
-  gap: 10px;
-  margin-top: auto;
-}
-
-.confirmBtn {
-  flex: 1;
-  background: linear-gradient(90deg, #10b981, #059669);
-  border: none;
-  color: white;
-  border-radius: 6px;
-  padding: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-
-.confirmBtn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
-.confirmBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.cancelBtn {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #94a3b8;
-  border-radius: 6px;
-  padding: 10px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-
-.cancelBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #f1f5f9;
-}
-
-/* Footer */
-.footer {
-  padding: 16px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.02);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  gap: 20px;
-}
-
-.footerStats {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  flex: 1;
-}
-
-.totalPrompts,
-.configuredPrompts,
-.pendingPrompts {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  border-radius: 10px;
-  min-width: 80px;
-  text-align: center;
-}
-
-.totalPrompts {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-
-.configuredPrompts {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.pendingPrompts {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-}
-
-.totalNumber,
-.configuredNumber,
-.pendingNumber {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 2px;
-}
-
-.totalNumber {
-  color: #6366f1;
-}
-
-.configuredNumber {
-  color: #10b981;
-}
-
-.pendingNumber {
-  color: #f59e0b;
-}
-
-.totalLabel,
-.configuredLabel,
-.pendingLabel {
-  font-size: 10px;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-}
-
-.footerActions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.cancelBtnLarge {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #94a3b8;
-  border-radius: 8px;
-  padding: 12px 24px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.cancelBtnLarge:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f1f5f9;
-}
-
-.saveBtn {
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
-  border: none;
-  color: white;
-  border-radius: 8px;
-  padding: 12px 28px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: all 0.3s;
-  white-space: nowrap;
-  min-width: 180px;
-  justify-content: center;
-}
-
-.saveBtn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.4);
-}
-
-.saveBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .popup {
-    width: 98%;
-    max-height: 95vh;
-  }
-  
-  .promptRow {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  
-  .emptyPromptSlot {
-    display: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .header {
-    padding: 16px 20px;
-  }
-  
-  .content {
-    padding: 0;
-  }
-  
-  .apiConfigSection,
-  .promptsSection {
-    padding: 16px 20px;
-  }
-  
-  .apiConfigGrid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  
-  .sectionHeader {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  
-  .sectionStats {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .footer {
-    flex-direction: column;
-    gap: 16px;
-    padding: 16px 20px;
-  }
-  
-  .footerStats {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .totalPrompts,
-  .configuredPrompts,
-  .pendingPrompts {
-    min-width: 70px;
-    padding: 6px 8px;
-  }
-  
-  .totalNumber,
-  .configuredNumber,
-  .pendingNumber {
-    font-size: 16px;
-  }
-  
-  .footerActions {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .saveBtn {
-    min-width: auto;
-    flex: 1;
-  }
-}
-
-@media (max-width: 480px) {
-  .promptCard {
-    padding: 16px;
-  }
-  
-  .promptHeader {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .removePromptBtn {
-    align-self: flex-end;
-  }
-  
-  .parameterContent {
-    flex-direction: column;
-  }
-  
-  .deleteParamBtn {
-    width: 100%;
-    height: 40px;
-  }
-  
-  .footerStats {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 12px;
-  }
-  
-  .totalPrompts,
-  .configuredPrompts,
-  .pendingPrompts {
-    min-width: 60px;
-  }
-}
-
-/* Scrollbar Styling */
-.content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-.content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-/* Add these to your existing APISettingsPopup.module.css */
-
+/* ── LOADER ── */
 .loaderContainer {
   display: flex;
   flex-direction: column;
@@ -1004,186 +141,749 @@
   min-height: 300px;
 }
 
-.loaderSpinner {
-  margin-bottom: 24px;
-}
+.loaderSpinner { margin-bottom: 22px; }
 
 .spinnerIcon {
   animation: spin 1s linear infinite;
-  color: #4f46e5;
+  color: #667eea;
 }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to   { transform: rotate(360deg); }
 }
 
-.loaderText h3 {
-  font-size: 20px;
+.loaderText h3 { font-size: 18px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+.loaderText p  { font-size: 13px; color: #94a3b8; margin: 0; }
+
+/* ── API CONFIG SECTION ── */
+.apiConfigSection {
+  padding: 20px 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.apiConfigGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.configInputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inputLabel {
+  font-size: 12px;
   font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.3px;
 }
 
-.loaderText p {
-  font-size: 14px;
-  color: #6b7280;
-  margin: 0;
+.inputLabel svg { color: #94a3b8; }
+
+/* URL input */
+.urlInput {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 13px 15px;
+  color: #f1f5f9;
+  font-size: 13px;
+  transition: all 0.25s;
+  outline: none;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.2px;
+  width: 100%;
 }
 
+.urlInput:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18),
+              0 4px 16px rgba(102, 126, 234, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+}
 
-/* Toggle Button Section */
+.urlInput::placeholder { color: #4b5563; }
+
+/* API Key wrapper */
+.apiKeyWrapper { position: relative; }
+
+.apiKeyInput {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 13px 15px;
+  padding-right: 50px;
+  color: #f1f5f9;
+  font-size: 13px;
+  transition: all 0.25s;
+  outline: none;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  box-sizing: border-box;
+}
+
+.apiKeyInput:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18),
+              0 4px 16px rgba(102, 126, 234, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.apiKeyInput::placeholder { color: #4b5563; }
+
+.eyeToggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.eyeToggle:hover { background: rgba(255, 255, 255, 0.14); color: #f1f5f9; }
+
+/* ── TOGGLE SECTION ── */
 .toggleSection {
   display: flex;
   justify-content: center;
-  margin: 20px 0;
-  padding: 0 16px;
+  padding: 18px 26px 0;
 }
 
 .toggleButton {
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
   border-radius: 8px;
-  padding: 12px 24px;
+  padding: 11px 24px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+  letter-spacing: 0.3px;
 }
 
 .toggleButton:hover:not(:disabled) {
-  background: linear-gradient(90deg, #4f46e5, #7c3aed);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 22px rgba(102, 126, 234, 0.42);
 }
 
-.toggleButton:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+.toggleButton:active:not(:disabled) { transform: translateY(0); }
+.toggleButton:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── PROMPTS SECTION ── */
+.promptsSection {
+  padding: 20px 26px 24px;
 }
 
-.toggleButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: linear-gradient(90deg, #a5b4fc, #c4b5fd);
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
-/* For child prompts indentation */
-.promptCard[data-type="child"] {
-  border-left: 3px solid #10b981;
-  margin-left: 20px;
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
 }
 
-.promptCard[data-type="root"] {
-  border-left: 3px solid #3b82f6;
+.sectionTitle svg { color: #667eea; }
+
+.sectionSubtitle {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 4px;
 }
 
-.parentInfo {
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 2px;
-  font-style: italic;
+.sectionStats { display: flex; gap: 10px; }
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 5px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* Add these styles for better visual hierarchy */
+.statItem svg { color: #667eea; }
+
+/* ── EMPTY STATE ── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 20px;
+  text-align: center;
+  border: 2px dashed rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.emptyIllustration {
+  color: rgba(255, 255, 255, 0.07);
+  margin-bottom: 18px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 18px;
+  border-radius: 50%;
+}
+
+.emptyState h3 { margin: 0 0 8px; color: #f1f5f9; font-size: 17px; font-weight: 700; }
+.emptyState p  { margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.6; max-width: 280px; }
+
+/* ── PROMPTS GRID ── */
+.promptsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.promptRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── PROMPT CARD ── */
 .promptCard {
-  transition: all 0.2s ease;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.25s ease;
+  animation: slideUp 0.35s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .promptCard:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(102, 126, 234, 0.32);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.2), 0 0 0 1px rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
 }
 
+/* Type accents matching admin color scheme */
+.promptCard[data-type="root"]  { border-left: 3px solid #667eea; border-radius: 0 14px 14px 0; }
+.promptCard[data-type="child"] { border-left: 3px solid #4CAF50; border-radius: 0 14px 14px 0; }
 
-/* Add these to your APISettingsPopup.module.css file */
+.emptyPromptSlot {
+  background: rgba(255,255,255,0.01);
+  border: 2px dashed rgba(255,255,255,0.04);
+  border-radius: 14px;
+  min-height: 280px;
+  opacity: 0.4;
+}
 
-/* Alternative: Circular Edit Button */
-.editParamBtn {
-  margin-left: auto;
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
-  border: none;
-  color: white;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
+/* ── PROMPT HEADER ── */
+.promptHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.promptMeta {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 
-    0 4px 6px rgba(139, 92, 246, 0.2),
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    0 0 0 2px rgba(255, 255, 255, 0.1) inset;
-  width: 30px;
-  height: 30px;
-  position: relative;
-  overflow: hidden;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.editParamBtn:hover {
-  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
-  transform: translateY(-2px) rotate(5deg);
-  box-shadow: 
-    0 8px 15px rgba(139, 92, 246, 0.3),
-    0 3px 6px rgba(0, 0, 0, 0.1),
-    0 0 0 2px rgba(255, 255, 255, 0.2) inset;
-}
+.promptInfo { display: flex; flex-direction: column; gap: 2px; }
 
-.editParamBtn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.6s ease;
-}
-
-.editParamBtn:hover::before {
-  left: 100%;
-}
-
-.editParamBtn svg {
-  position: relative;
-  z-index: 1;
-}
-
-.parameterValue {
-  flex: 1;
-  padding: 8px 12px;
- 
-  
-  border-radius: 6px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 14px;
-  color: #e9ecef;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Number badge — purple gradient, same as admin stat badges */
+.promptNumber {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 16px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
 }
 
-.editActions {
+.parentInfo { font-size: 11px; color: #64748b; font-style: italic; }
+
+.promptStatus { font-size: 11px; font-weight: 600; flex-shrink: 0; }
+
+.hasParameter {
   display: flex;
-  gap: 8px;
-  margin-left: 8px;
+  align-items: center;
+  gap: 4px;
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.14);
+  padding: 4px 10px;
+  border-radius: 16px;
 }
 
-/* Update existing styles for parameterContent */
+.noParameter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #FF9800;
+  background: rgba(255, 152, 0, 0.14);
+  padding: 4px 10px;
+  border-radius: 16px;
+}
+
+/* ── PROMPT TEXT ── */
+.promptTextContainer {
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.lockIcon { color: #64748b; margin-top: 2px; flex-shrink: 0; }
+
+.promptText {
+  flex: 1;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.55;
+  word-break: break-word;
+  font-style: italic;
+  opacity: 0.88;
+  overflow-y: auto;
+  max-height: 100px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102,126,234,0.3) transparent;
+}
+
+/* ── PARAMETER CARD ── */
+.parameterSection { flex: 1; display: flex; flex-direction: column; }
+
+.parameterCard {
+  background: rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(102, 126, 234, 0.22);
+  border-radius: 10px;
+  padding: 14px;
+  animation: slideIn 0.25s ease;
+  flex: 1;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.parameterHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.paramIcon { color: #667eea; }
+
+.paramLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a5b4fc;
+  letter-spacing: 0.3px;
+}
+
 .parameterContent {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* When in edit mode, make the input take full width */
-.parameterCard .parameterInput {
+.parameterInput {
   flex: 1;
-  min-width: 0;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  padding: 9px 13px;
+  color: #f1f5f9;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.parameterInput:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18);
+}
+
+.parameterValue {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #e9ecef;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleteParamBtn {
+  background: rgba(255, 68, 68, 0.14);
+  border: 1px solid rgba(255, 68, 68, 0.24);
+  border-radius: 7px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff4444;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.deleteParamBtn:hover { background: rgba(255, 68, 68, 0.24); transform: scale(1.06); }
+
+/* Edit param button */
+.editParamBtn {
+  margin-left: auto;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 7px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 8px rgba(102, 126, 234, 0.28);
+  flex-shrink: 0;
+}
+
+.editParamBtn:hover {
+  transform: translateY(-2px) rotate(5deg);
+  box-shadow: 0 6px 14px rgba(102, 126, 234, 0.38);
+}
+
+/* Edit actions */
+.editActions { display: flex; gap: 7px; margin-left: 7px; }
+
+/* ── ADD PARAMETER SECTION ── */
+.addParameterSection { flex: 1; display: flex; flex-direction: column; }
+
+.addParameterPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 22px 16px;
+  border: 2px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.01);
+  text-align: center;
+  transition: all 0.25s;
+  flex: 1;
+}
+
+.addParameterPrompt:hover {
+  border-color: rgba(102, 126, 234, 0.32);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.addParamBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.25s;
+  margin-bottom: 8px;
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.28);
+}
+
+.addParamBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(102, 126, 234, 0.38);
+}
+
+.addPromptHint { color: #64748b; font-size: 11px; line-height: 1.4; }
+
+.databaseNote {
+  background: rgba(76, 175, 80, 0.14);
+  color: #4CAF50;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* Add form */
+.addParameterForm {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 120px;
+}
+
+.formHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: #667eea;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.formGroup { flex: 1; display: flex; flex-direction: column; }
+
+.newParamInput {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 11px 13px;
+  color: #f1f5f9;
+  font-size: 13px;
+  outline: none;
+  margin-bottom: 10px;
+  transition: all 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: 'Courier New', monospace;
+}
+
+.newParamInput:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18);
+}
+
+.newParamInput::placeholder { color: #4b5563; }
+
+.formActions { display: flex; gap: 8px; margin-top: auto; }
+
+/* Confirm + Cancel shared in both popups */
+.confirmBtn {
+  flex: 1;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  border: none;
+  color: white;
+  border-radius: 7px;
+  padding: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s;
+  box-shadow: 0 3px 8px rgba(76, 175, 80, 0.24);
+}
+
+.confirmBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(76, 175, 80, 0.34);
+}
+
+.confirmBtn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.cancelBtn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: #94a3b8;
+  border-radius: 7px;
+  padding: 9px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+
+.cancelBtn:hover { background: rgba(255, 255, 255, 0.12); color: #f1f5f9; }
+
+/* ── FOOTER ── */
+.footer {
+  padding: 14px 26px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.01);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  flex-shrink: 0;
+}
+
+.footerStats { display: flex; gap: 12px; align-items: center; flex: 1; }
+
+.totalPrompts,
+.configuredPrompts,
+.pendingPrompts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 10px;
+  min-width: 80px;
+  text-align: center;
+}
+
+/* Total — purple (admin accent) */
+.totalPrompts {
+  background: rgba(102, 126, 234, 0.12);
+  border: 1px solid rgba(102, 126, 234, 0.22);
+}
+
+/* Configured — green (admin primary action) */
+.configuredPrompts {
+  background: rgba(76, 175, 80, 0.12);
+  border: 1px solid rgba(76, 175, 80, 0.22);
+}
+
+/* Pending — orange (admin upgrade prompt) */
+.pendingPrompts {
+  background: rgba(255, 152, 0, 0.12);
+  border: 1px solid rgba(255, 152, 0, 0.22);
+}
+
+.totalNumber     { font-size: 18px; font-weight: 800; color: #667eea; margin-bottom: 2px; }
+.configuredNumber{ font-size: 18px; font-weight: 800; color: #4CAF50; margin-bottom: 2px; }
+.pendingNumber   { font-size: 18px; font-weight: 800; color: #FF9800; margin-bottom: 2px; }
+
+.totalLabel, .configuredLabel, .pendingLabel {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.footerActions { display: flex; gap: 10px; align-items: center; }
+
+.cancelBtnLarge {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  border-radius: 8px;
+  padding: 11px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.cancelBtnLarge:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: #f1f5f9; }
+
+/* Save button — purple gradient (matches admin header) */
+.saveBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  border-radius: 8px;
+  padding: 11px 28px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  transition: all 0.25s;
+  white-space: nowrap;
+  min-width: 170px;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+
+.saveBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(102, 126, 234, 0.44);
+}
+
+.saveBtn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Spinner */
+.spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1024px) {
+  .popup { width: 98%; max-height: 95vh; }
+  .promptRow { grid-template-columns: 1fr; gap: 14px; }
+  .emptyPromptSlot { display: none; }
+}
+
+@media (max-width: 768px) {
+  .header { padding: 14px 18px; }
+  .apiConfigSection, .promptsSection { padding: 16px 18px; }
+  .apiConfigGrid { grid-template-columns: 1fr; gap: 14px; }
+  .sectionHeader { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .sectionStats { width: 100%; justify-content: space-between; }
+  .footer { flex-direction: column; gap: 14px; padding: 14px 18px; }
+  .footerStats { width: 100%; justify-content: space-between; }
+  .footerActions { width: 100%; justify-content: space-between; }
+  .saveBtn { min-width: auto; flex: 1; }
+}
+
+@media (max-width: 480px) {
+  .promptCard { padding: 14px; }
+  .promptHeader { flex-direction: column; gap: 8px; }
+  .parameterContent { flex-direction: column; }
+  .deleteParamBtn { width: 100%; height: 38px; }
+  .footerStats { flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .totalPrompts, .configuredPrompts, .pendingPrompts { min-width: 60px; }
 }

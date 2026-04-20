@@ -11,7 +11,7 @@ import PlanLimitModal from '../app/components/PlanLimitModal';
 const API_URL         = `${config.apiBaseUrl}/api/websites`;
 const MAX_BOT_API_URL = '/api/user/max-bot';
 const SESSION_API_URL = '/api/auth/session';
-const POLL_INTERVAL   = 8000;
+const POLL_INTERVAL   = 3000; // Reduced to 3 seconds for faster updates
 
 const AdminPanel = () => {
   const router = useRouter();
@@ -43,9 +43,8 @@ const AdminPanel = () => {
   const userDataRef          = useRef(null);
   const authTokenRef         = useRef(null);
   const modalOpenRef         = useRef(false);
-
-  // pollStarted ref to ensure only one interval is created
-  const pollStarted = useRef(false);
+  const pollStarted          = useRef(false);
+  const isMounted            = useRef(true);
 
   userDataRef.current  = userData;
   authTokenRef.current = authToken;
@@ -54,23 +53,33 @@ const AdminPanel = () => {
   useEffect(() => {
     modalOpenRef.current = showPlanModal;
 
-    // Modal open → scroll off, Modal close → scroll back
     if (showPlanModal) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
 
-    // Cleanup: restore scroll on component unmount
     return () => {
       document.body.style.overflow = '';
     };
   }, [showPlanModal]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, []);
+
   const [configData, setConfigData] = useState({
     websiteName: '', websiteUrl: '', category: [],
     systemPrompt: [], customPrompt: [], roles: [],
-    aifuture: [], status: 'active'
+    aifuture: [], status: 'active', description: '', tags: []
   });
   const [tempSystemPrompt, setTempSystemPrompt] = useState('');
   const [tempCustomPrompt, setTempCustomPrompt] = useState('');
@@ -280,10 +289,6 @@ const AdminPanel = () => {
 
   // ─────────────────────────────────────────────────────────────
   // PLAN ENFORCEMENT
-  //
-  // activeCount > maxBot  → modal OPEN
-  // activeCount <= maxBot → modal CLOSE
-  // Modal open → items/bots freeze (poll skip)
   // ─────────────────────────────────────────────────────────────
   const checkAndEnforcePlanLimit = useCallback((fetchedItems, maxBot) => {
     if (!maxBot || maxBot <= 0) return;
@@ -291,33 +296,43 @@ const AdminPanel = () => {
     const activeCount = fetchedItems.filter(b => b.status === 'active').length;
 
     if (activeCount > maxBot) {
-      // Limit exceeded — open modal if not already open
       if (!modalOpenRef.current) {
         setPlanModalBots(fetchedItems);
         setShowPlanModal(true);
       }
     } else {
-      // Limit is fine — close modal if open
       if (modalOpenRef.current) {
         setShowPlanModal(false);
       }
     }
   }, []);
 
-  // ── FETCH WEBSITES ──
-  const fetchUserItems = useCallback(async (silent = false) => {
-    const ud    = userDataRef.current;
+  // ── IMMEDIATE UPDATE FUNCTION ──
+  const updateItemInList = useCallback((updatedItem) => {
+    setItems(prev => prev.map(item => 
+      item.id === updatedItem.id ? { ...item, ...updatedItem } : item
+    ));
+  }, []);
+
+  const removeItemFromList = useCallback((itemId) => {
+    setItems(prev => prev.filter(item => item.id !== itemId));
+  }, []);
+
+  const addItemToList = useCallback((newItem) => {
+    setItems(prev => [newItem, ...prev]);
+  }, []);
+
+  // ── FORCE REFRESH FUNCTION ──
+  const forceRefreshData = useCallback(async () => {
+    const ud = userDataRef.current;
     const token = authTokenRef.current;
     if (!ud || !token || !isTokenValidated) return;
-
-    // Modal open → silent poll skip — bots freeze
-    if (silent && modalOpenRef.current) return;
 
     try {
       const res = await fetch(`${API_URL}/user/${ud.userId}/websites`, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type':  'application/json'
+          'Content-Type': 'application/json'
         },
         cache: 'no-store'
       });
@@ -334,26 +349,61 @@ const AdminPanel = () => {
 
       const processed = (data.items || data.data || []).map(item => ({
         ...item,
-        roles:        item.role || item.roles || [],
-        aifuture:     item.aifuture || [],
+        roles: item.role || item.roles || [],
+        aifuture: item.aifuture || [],
         planDisabled: item.planDisabled || false,
+        description: item.description || '',
+        tags: item.tags || []
       }));
 
-      // Update items only when modal is closed
-      if (!modalOpenRef.current) {
-        setItems(prev => {
-          if (!silent) return processed;
-          const prevMap = Object.fromEntries(prev.map(i => [i.id, i]));
-          return processed.map(newItem => {
-            const old = prevMap[newItem.id];
-            if (!old) return newItem;
-            if (
-              old.status           !== newItem.status ||
-              old.superAdminLocked !== newItem.superAdminLocked
-            ) return newItem;
-            return old;
-          });
-        });
+      if (isMounted.current) {
+        setItems(processed);
+        websitesFetched.current = true;
+        checkAndEnforcePlanLimit(processed, ud.maxBot);
+      }
+    } catch (err) {
+      console.error('Refresh error:', err);
+    }
+  }, [isTokenValidated, checkAndEnforcePlanLimit]);
+
+  // ── FETCH WEBSITES ──
+  const fetchUserItems = useCallback(async (silent = false) => {
+    const ud    = userDataRef.current;
+    const token = authTokenRef.current;
+    if (!ud || !token || !isTokenValidated) return;
+
+    if (silent && modalOpenRef.current) return;
+
+    try {
+      const res = await fetch(`${API_URL}/user/${ud.userId}/websites`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        sessionStorage.removeItem('adminAuthToken');
+        window.location.replace('/login');
+        return;
+      }
+      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'API error');
+
+      const processed = (data.items || data.data || []).map(item => ({
+        ...item,
+        roles: item.role || item.roles || [],
+        aifuture: item.aifuture || [],
+        planDisabled: item.planDisabled || false,
+        description: item.description || '',
+        tags: item.tags || []
+      }));
+
+      if (isMounted.current) {
+        setItems(processed);
       }
 
       if (!silent) {
@@ -361,7 +411,6 @@ const AdminPanel = () => {
         websitesFetched.current = true;
       }
 
-      // Plan limit check — handles both modal open/close
       checkAndEnforcePlanLimit(processed, ud.maxBot);
 
     } catch (err) {
@@ -376,15 +425,17 @@ const AdminPanel = () => {
     }
   }, [userData, authToken, isTokenValidated, fetchUserItems]);
 
-  // ── COMBINED POLLING - Calls both APIs every 8 seconds ──
+  // ── COMBINED POLLING ──
   useEffect(() => {
     if (!userData || !authToken || !isTokenValidated) return;
-    if (pollStarted.current) return; // Already started
+    if (pollStarted.current) return;
     pollStarted.current = true;
 
     pollRef.current = setInterval(() => {
-      fetchUserItems(true);      // Fetch websites
-      fetchMaxBotLimit();        // Fetch max-bot limit
+      if (!modalOpenRef.current) {
+        fetchUserItems(true);
+      }
+      fetchMaxBotLimit();
     }, POLL_INTERVAL);
 
     return () => {
@@ -394,7 +445,7 @@ const AdminPanel = () => {
       }
       pollStarted.current = false;
     };
-  }, [isTokenValidated]); // Only depends on isTokenValidated
+  }, [isTokenValidated, fetchUserItems, fetchMaxBotLimit]);
 
   // ─────────────────────────────────────────────────────────────
   // MODAL CONFIRM
@@ -408,10 +459,9 @@ const AdminPanel = () => {
       b => b.status === 'active' && !selectedIds.includes(b.id)
     );
 
-    // Step 1: Close modal
     setShowPlanModal(false);
 
-    // Step 2: Optimistic UI update
+    // Immediate UI update
     setItems(prev => prev.map(item =>
       toDisable.some(d => d.id === item.id)
         ? { ...item, status: 'inactive', planDisabled: true }
@@ -424,19 +474,18 @@ const AdminPanel = () => {
       return;
     }
 
-    // Step 3: Backend API call
     try {
       await Promise.all(
         toDisable.map(bot =>
           fetch(`${API_URL}/${bot.id}/status/role-aware`, {
-            method:  'PATCH',
+            method: 'PATCH',
             headers: {
-              'Content-Type':  'application/json',
+              'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-              status:       'inactive',
-              changedBy:    'admin',
+              status: 'inactive',
+              changedBy: 'admin',
               planDisabled: true,
             }),
           }).catch(() => null)
@@ -448,9 +497,8 @@ const AdminPanel = () => {
       );
       setTimeout(() => setShowSuccessMessage(''), 3000);
 
-      // Step 4: Fresh data
-      await fetchUserItems(false);
-
+      // Silent refresh to sync with backend
+      setTimeout(() => fetchUserItems(true), 500);
     } catch {
       setError('Some bots could not be disabled. Please refresh.');
     }
@@ -461,7 +509,7 @@ const AdminPanel = () => {
     setConfigData({
       websiteName: '', websiteUrl: '', category: [],
       systemPrompt: [], customPrompt: [], roles: [],
-      aifuture: [], status: 'active'
+      aifuture: [], status: 'active', description: '', tags: []
     });
     setTempSystemPrompt(''); setTempCustomPrompt('');
     setTempCategory(''); setTempRole(''); setTempRoleValue('');
@@ -480,54 +528,91 @@ const AdminPanel = () => {
 
   const handleShowList = () => { resetForm(); setShowForm(false); };
 
-  // ── SUBMIT ──
+  // ── SUBMIT WITH IMMEDIATE UPDATE ──
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!authToken || !userData || !isTokenValidated) { window.location.replace('/login'); return; }
-    setSaving(true); setError(null);
+    if (!authToken || !userData || !isTokenValidated) { 
+      window.location.replace('/login'); 
+      return; 
+    }
+    setSaving(true); 
+    setError(null);
 
     if (!editingId && items.length >= userData.maxBot) {
       setError(`You've reached your limit of ${userData.maxBot} websites.`);
-      setSaving(false); return;
+      setSaving(false); 
+      return;
     }
 
     const payload = {
-      websiteName: configData.websiteName, websiteUrl: configData.websiteUrl,
-      category: configData.category, systemPrompt: configData.systemPrompt,
-      customPrompt: configData.customPrompt, role: configData.roles,
-      aifuture: configData.aifuture, status: configData.status, userId: userData.userId
+      websiteName: configData.websiteName, 
+      websiteUrl: configData.websiteUrl,
+      description: configData.description || '',
+      tags: configData.tags || [],
+      category: configData.category, 
+      systemPrompt: configData.systemPrompt,
+      customPrompt: configData.customPrompt, 
+      role: configData.roles,
+      aifuture: configData.aifuture, 
+      status: configData.status, 
+      userId: userData.userId
     };
 
     try {
-      const url    = editingId ? `${API_URL}/user/${userData.userId}/websites/${editingId}` : API_URL;
+      const url = editingId 
+        ? `${API_URL}/user/${userData.userId}/websites/${editingId}` 
+        : API_URL;
       const method = editingId ? 'PUT' : 'POST';
-      const res    = await fetch(url, {
+      const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${authToken}` 
+        },
         body: JSON.stringify(payload),
       });
 
       if (res.status === 401 || res.status === 403) {
-        sessionStorage.removeItem('adminAuthToken'); window.location.replace('/login'); return;
+        sessionStorage.removeItem('adminAuthToken'); 
+        window.location.replace('/login'); 
+        return;
       }
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed: ${res.status}`);
       }
 
+      const responseData = await res.json();
+      const savedItem = responseData.item || responseData;
+
+      // Immediate UI update
+      if (editingId) {
+        updateItemInList(savedItem);
+      } else {
+        addItemToList(savedItem);
+      }
+
       setShowSuccessMessage(editingId ? '✅ Website updated!' : '✅ Website created!');
       setTimeout(() => setShowSuccessMessage(''), 3000);
-      websitesFetched.current = false;
-      await fetchUserItems(false);
-      resetForm(); setShowForm(false);
+      
+      resetForm(); 
+      setShowForm(false);
+      
+      // Silent background refresh to ensure sync
+      setTimeout(() => fetchUserItems(true), 500);
     } catch (err) {
       setError(err.message || 'Error saving data');
-    } finally { setSaving(false); }
+    } finally { 
+      setSaving(false); 
+    }
   };
 
-  // ── STATUS CHANGE ──
+  // ── STATUS CHANGE WITH IMMEDIATE UPDATE ──
   const handleStatusChange = async (id, newStatus) => {
-    if (!authToken || !userData || !isTokenValidated) { window.location.replace('/login'); return; }
+    if (!authToken || !userData || !isTokenValidated) { 
+      window.location.replace('/login'); 
+      return; 
+    }
 
     if (newStatus === 'active') {
       const currentActive = items.filter(b => b.status === 'active' && b.id !== id).length;
@@ -540,10 +625,20 @@ const AdminPanel = () => {
       }
     }
 
+    // Immediate UI update
+    setItems(prev => prev.map(item =>
+      item.id === id
+        ? { ...item, status: newStatus }
+        : item
+    ));
+
     try {
       const res = await fetch(`${API_URL}/${id}/status/role-aware`, {
-        method:  'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${authToken}` 
+        },
         body: JSON.stringify({ status: newStatus, changedBy: 'admin' }),
       });
 
@@ -551,59 +646,103 @@ const AdminPanel = () => {
 
       if (res.status === 403 && data.locked) {
         setError('🔒 Locked by SuperAdmin. Only SuperAdmin can reactivate this website.');
+        // Revert on error
+        setItems(prev => prev.map(item =>
+          item.id === id
+            ? { ...item, status: item.status === 'active' ? 'inactive' : 'active' }
+            : item
+        ));
         return;
       }
       if (res.status === 401 || res.status === 403) {
-        sessionStorage.removeItem('adminAuthToken'); window.location.replace('/login'); return;
+        sessionStorage.removeItem('adminAuthToken'); 
+        window.location.replace('/login'); 
+        return;
       }
       if (!res.ok) throw new Error(data.error || 'Failed to update status');
 
+      // Update with server response
       setItems(prev => prev.map(item =>
         item.id === id
           ? {
               ...item,
-              status:           newStatus,
+              status: newStatus,
               superAdminLocked: data.item?.superAdminLocked || false,
-              planDisabled:     newStatus === 'active' ? false : item.planDisabled,
+              planDisabled: newStatus === 'active' ? false : item.planDisabled,
             }
           : item
       ));
+      
       setShowSuccessMessage(`✅ Status updated to ${newStatus}`);
       setTimeout(() => setShowSuccessMessage(''), 2000);
-    } catch (err) { setError(err.message || 'Error updating status'); }
+    } catch (err) { 
+      setError(err.message || 'Error updating status');
+      // Revert on error
+      setItems(prev => prev.map(item =>
+        item.id === id
+          ? { ...item, status: item.status === 'active' ? 'inactive' : 'active' }
+          : item
+      ));
+    }
   };
 
   // ── EDIT ──
   const handleEdit = (id) => {
-    if (!authToken || !userData || !isTokenValidated) { window.location.replace('/login'); return; }
+    if (!authToken || !userData || !isTokenValidated) { 
+      window.location.replace('/login'); 
+      return; 
+    }
     const item = items.find(i => i.id === id);
     if (item) {
       setConfigData({
-        websiteName: item.websiteName, websiteUrl: item.websiteUrl,
-        category: item.category || [], systemPrompt: item.systemPrompt || [],
-        customPrompt: item.customPrompt || [], roles: item.roles || [],
-        aifuture: item.aifuture || [], status: item.status || 'active', apiKey: item.apiKey
+        websiteName: item.websiteName, 
+        websiteUrl: item.websiteUrl,
+        description: item.description || '',
+        tags: item.tags || [],
+        category: item.category || [], 
+        systemPrompt: item.systemPrompt || [],
+        customPrompt: item.customPrompt || [], 
+        roles: item.roles || [],
+        aifuture: item.aifuture || [], 
+        status: item.status || 'active', 
+        apiKey: item.apiKey
       });
-      setEditingId(id); setShowForm(true);
+      setEditingId(id); 
+      setShowForm(true);
     }
   };
 
-  // ── DELETE ──
+  // ── DELETE WITH IMMEDIATE UPDATE ──
   const handleDelete = async (id) => {
-    if (!authToken || !userData || !isTokenValidated) { window.location.replace('/login'); return; }
+    if (!authToken || !userData || !isTokenValidated) { 
+      window.location.replace('/login'); 
+      return; 
+    }
+    
+    // Immediate UI update
+    removeItemFromList(id);
+    
     try {
       const res = await fetch(`${API_URL}/user/${userData.userId}/websites/${id}/soft`, {
-        method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` }
+        method: 'DELETE', 
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (res.status === 401 || res.status === 403) {
-        sessionStorage.removeItem('adminAuthToken'); window.location.replace('/login'); return;
+        sessionStorage.removeItem('adminAuthToken'); 
+        window.location.replace('/login'); 
+        return;
       }
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+      
       setShowSuccessMessage('✅ Website removed!');
       setTimeout(() => setShowSuccessMessage(''), 2000);
-      setItems(prev => prev.filter(item => item.id !== id));
+      
       if (items.length <= 1) setShowForm(true);
-    } catch (err) { setError(err.message || 'Delete error'); }
+    } catch (err) { 
+      setError(err.message || 'Delete error');
+      // Revert on error - refetch data
+      fetchUserItems(false);
+    }
   };
 
   // ── LOGOUT ──
@@ -612,10 +751,16 @@ const AdminPanel = () => {
   const performLogout = async () => {
     if (pollRef.current) clearInterval(pollRef.current);
     if (expiryCheckInterval.current) clearInterval(expiryCheckInterval.current);
-    sessionStorage.removeItem('adminAuthToken'); sessionStorage.clear();
+    sessionStorage.removeItem('adminAuthToken'); 
+    sessionStorage.clear();
     localStorage.removeItem('adminAuthToken');
-    setUserData(null); setAuthToken(null); setItems([]); setIsTokenValidated(false);
-    tokenCheckedRef.current = false; websitesFetched.current = false; pollStarted.current = false;
+    setUserData(null); 
+    setAuthToken(null); 
+    setItems([]); 
+    setIsTokenValidated(false);
+    tokenCheckedRef.current = false; 
+    websitesFetched.current = false; 
+    pollStarted.current = false;
     await signOut({ callbackUrl: '/login', redirect: true });
     window.location.replace('/login');
   };
@@ -753,69 +898,92 @@ const AdminPanel = () => {
 
       <div className={styles.adminContent}>
         <div className={styles.headerBottom}>
-          <div className={styles.actionButtons}>
-            <div className={styles.buttonWithUpgrade}>
-              <button
-                className={`${styles.primaryButton} ${items.length >= userData.maxBot ? styles.disabled : ''}`}
-                onClick={handleAddNew}
-                disabled={items.length >= userData.maxBot}
-              >
-                <span className={styles.buttonIcon}>+</span>
-                Add New Website
-              </button>
-              {items.length >= userData.maxBot && !editingId && (
-                <div className={styles.upgradePrompt}>
-                  <span className={styles.upgradeIcon}>✨</span>
-                  <span className={styles.upgradeText}>
-                    Max limit reached.{' '}
-                    <button onClick={() => router.push('/pricing')} className={styles.upgradeLink}>
-                      Upgrade plan
-                    </button>
-                  </span>
-                </div>
-              )}
-            </div>
+       
+<div className={styles.actionButtons}>
+  <div className={styles.buttonWithUpgrade}>
+    <button
+      className={`${styles.primaryButton} ${
+        !showForm && items.length >= userData.maxBot ? styles.disabled : ''
+      }`}
+      onClick={showForm ? handleShowList : handleAddNew}
+      disabled={!showForm && items.length >= userData.maxBot}
+    >
+      <span className={styles.buttonIcon}>
+        {showForm ? '←' : '+'}
+      </span>
+      {showForm ? 'Back to List' : 'Add New Website'}
+    </button>
 
-            {items.length > 0 && (
-              <div className={styles.statsBox}>
-                <div className={styles.statItem}>
-                  <span className={`${styles.statNumber} ${activeCount > userData.maxBot ? styles.warningText : ''}`}>
-                    {activeCount}
-                  </span>
-                  <span className={styles.statLabel}>Active</span>
-                </div>
-                <div className={styles.statDivider}>|</div>
-                <div className={styles.statItem}>
-                  <span className={styles.statNumber}>{items.filter(i => i.status === 'inactive').length}</span>
-                  <span className={styles.statLabel}>Inactive</span>
-                </div>
-                <div className={styles.statDivider}>|</div>
-                <div className={styles.statItem}>
-                  <span className={styles.statNumber}>{items.length}</span>
-                  <span className={styles.statLabel}>Total</span>
-                </div>
-              </div>
-            )}
-          </div>
+    {!showForm && items.length >= userData.maxBot && !editingId && (
+      <div className={styles.upgradePrompt}>
+        <span className={styles.upgradeIcon}>✨</span>
+        <span className={styles.upgradeText}>
+          Max limit reached.{' '}
+          <button onClick={() => router.push('/pricing')} className={styles.upgradeLink}>
+            Upgrade plan
+          </button>
+        </span>
+      </div>
+    )}
+  </div>
+
+  {items.length > 0 && (
+    <div className={styles.statsBox}>
+      <div className={styles.statItem}>
+        <span className={`${styles.statNumber} ${activeCount > userData.maxBot ? styles.warningText : ''}`}>
+          {activeCount}
+        </span>
+        <span className={styles.statLabel}>Active</span>
+      </div>
+      <div className={styles.statDivider}>|</div>
+      <div className={styles.statItem}>
+        <span className={styles.statNumber}>
+          {items.filter(i => i.status === 'inactive').length}
+        </span>
+        <span className={styles.statLabel}>Inactive</span>
+      </div>
+      <div className={styles.statDivider}>|</div>
+      <div className={styles.statItem}>
+        <span className={styles.statNumber}>{items.length}</span>
+        <span className={styles.statLabel}>Total</span>
+      </div>
+    </div>
+  )}
+</div>
         </div>
 
         {showForm ? (
           <WebsiteConfig
-            config={configData} setConfig={setConfigData}
-            tempSystemPrompt={tempSystemPrompt} setTempSystemPrompt={setTempSystemPrompt}
-            tempCustomPrompt={tempCustomPrompt} setTempCustomPrompt={setTempCustomPrompt}
-            tempCategory={tempCategory} setTempCategory={setTempCategory}
-            tempRole={tempRole} setTempRole={setTempRole}
-            tempRoleValue={tempRoleValue} setTempRoleValue={setTempRoleValue}
-            onSubmit={handleSubmit} onCancel={handleShowList}
-            hasItems={items.length > 0} websiteId={editingId}
-            apiKey={configData.apiKey} backendApiKey={configData.apiKey}
-            userData={userData} saving={saving}
+            config={configData} 
+            setConfig={setConfigData}
+            tempSystemPrompt={tempSystemPrompt} 
+            setTempSystemPrompt={setTempSystemPrompt}
+            tempCustomPrompt={tempCustomPrompt} 
+            setTempCustomPrompt={setTempCustomPrompt}
+            tempCategory={tempCategory} 
+            setTempCategory={setTempCategory}
+            tempRole={tempRole} 
+            setTempRole={setTempRole}
+            tempRoleValue={tempRoleValue} 
+            setTempRoleValue={setTempRoleValue}
+            onSubmit={handleSubmit} 
+            onCancel={handleShowList}
+            hasItems={items.length > 0} 
+            websiteId={editingId}
+            apiKey={configData.apiKey} 
+            backendApiKey={configData.apiKey}
+            userData={userData} 
+            saving={saving}
+            onRefresh={forceRefreshData}
           />
         ) : items.length > 0 ? (
           <WebsiteList
-            websites={items} onEdit={handleEdit} onDelete={handleDelete}
-            onAddNew={handleAddNew} onStatusChange={handleStatusChange} userData={userData}
+            websites={items} 
+            onEdit={handleEdit} 
+            onDelete={handleDelete}
+            onAddNew={handleAddNew} 
+            onStatusChange={handleStatusChange} 
+            userData={userData}
           />
         ) : (
           <div className={styles.emptyState}>

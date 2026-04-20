@@ -1,4 +1,4 @@
-"use client"
+
 
 import React, { useMemo, useState, useEffect } from "react"
 import styles from "./CustomPromptPopup.module.css"
@@ -600,7 +600,7 @@ const countAllSubChildPromptsSimple = (nodes: PromptNode[]): number => {
                 disabled={loading || isLoadingData}
               >
                 <Trash2 size={16} />
-                Delete from Server
+                Delete 
               </button>
             )}
             

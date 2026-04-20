@@ -1,3 +1,4 @@
+//pages/api/user/token-details.js
 import { getUserSubscription } from "../../../app/model/subscription-db";
 import { getWalletBalance } from "../../../app/model/token-wallet-db";
 // ✅ 1. IMPORT YOUR USER DB FUNCTION
@@ -68,75 +69,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 }
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "../auth/[...nextauth]";
-// import { getUserSubscription } from "../../../app/model/subscription-db";
-// import { getWalletBalance } from "../../../app/model/token-wallet-db";
-
-// export default async function handler(req, res) {
-//   if (req.method !== 'GET') {
-//     return res.status(405).json({ error: "Method not allowed" });
-//   }
-
-//   try {
-//     // 1. Authenticate using NextAuth (Exactly like max-bot.js)
-//     const session = await getServerSession(req, res, authOptions);
-    
-//     if (!session) {
-//       return res.status(401).json({ success: false, error: "Unauthorized" });
-//     }
-
-//     const userId = session.user.id;
-//     const userEmail = session.user.email;
-
-//     // 2. Fetch both the subscription and wallet balance
-//     const [sub, boosterTokens] = await Promise.all([
-//       getUserSubscription(userId),
-//       getWalletBalance(userId)
-//     ]);
-
-//     let planExpirationDate = null;
-//     let planTokens = 0;
-
-//     // 3. Extract exact plan tokens (Exactly like max-bot.js)
-//     if (sub) {
-//       planExpirationDate = sub.expire_date || null;
-      
-//       // Only grant plan tokens if the subscription is actively paying or in grace period
-//       if (["Active", "Action Required"].includes(sub.status)) {
-        
-//         const features = sub.snapshot_system_features || sub.snapshot_features || {};
-        
-//         // Find the key that contains "token" (case insensitive)
-//         const tokenKey = Object.keys(features).find(k => /token/i.test(k));
-        
-//         if (tokenKey) {
-//           // Remove commas and convert to integer
-//           const cleanTokenString = String(features[tokenKey]).replace(/,/g, '');
-//           planTokens = parseInt(cleanTokenString);
-//           if (isNaN(planTokens)) planTokens = 0;
-//         }
-//       }
-//     }
-
-//     // 4. Calculate Total Tokens
-//     const totalTokens = planTokens + Number(boosterTokens);
-
-//     // 5. Return JSON format
-//     return res.status(200).json({
-//       success: true,
-//       data: {
-//         userId: userId,
-//         userEmail: userEmail,
-//         planExpirationDate: planExpirationDate,
-//         planToken: planTokens,
-//         boosterToken: Number(boosterTokens),
-//         totalToken: totalTokens
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error("Error fetching token details:", error);
-//     return res.status(500).json({ success: false, error: "Internal Server Error" });
-//   }
-// }

@@ -1,14 +1,12 @@
-/* ChatHeader.module.css */
-
 .chatHeader {
-  padding: 12px 16px;
+  padding: 14px 16px 16px;
   color: white;
-  border-radius: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  flex-shrink: 0; /* Prevent header from shrinking */
+  flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 10;
+  /* ✅ Bottom shadow — header ko alag dikhata hai */
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18), 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
 .headerContent {
@@ -26,85 +24,110 @@
 
 .avatarContainer {
   position: relative;
-  width: 40px;
-  height: 40px;
-  background: #fff;
+  width: 42px;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  /* ✅ Avatar ke liye subtle ring */
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
 }
 
 .medicalAvatar {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1;
   position: relative;
-  top: 2px;
+  top: 1px;
 }
 
+/* ✅ Online status dot — glowing effect */
 .statusIndicator {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 12px;
-  height: 12px;
+  bottom: 0px;
+  right: 0px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  border: 2px solid white;
+  border: 2.5px solid white;
+  /* Glow sirf green (online) pe accha lagta hai — inline style se color aata hai */
 }
 
 .titleContainer {
-  line-height: 1.2;
+  line-height: 1.3;
+  min-width: 0;
 }
 
 .title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15.5px;
+  font-weight: 700;
   color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* ✅ Subtle text shadow for readability on any color */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  letter-spacing: 0.2px;
 }
 
+/* ✅ Status text — white pe readable, any header color pe */
 .statusText {
   margin: 0;
-  font-size: 12px;
-  opacity: 0.9;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
+  opacity: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.3px;
+  /* Readable on any bg color */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
+
+/* ✅ Status dot inside text */
+
 
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .closeButton {
-  background: transparent;
-  width: 32px;
-  height: 32px;
+  background: rgba(255, 255, 255, 0.15);
+  width: 34px;
+  height: 34px;
   border: none;
-  font-size: 22px;
-  font-weight: bold;
+  font-size: 20px;
+  font-weight: 400;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  border-radius: 50%;
+  line-height: 1;
 }
 
 .closeButton:hover {
-  transform: scale(1.1);
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.28);
+  transform: scale(1.08);
 }
 
-/* Hide close button on desktop by default */
+.closeButton:active {
+  transform: scale(0.96);
+}
+
 @media (min-width: 769px) {
   .headerActions {
     display: none;
   }
 }
 
-/* Mobile styles */
 @media (max-width: 768px) {
   .chatHeader {
     position: sticky;

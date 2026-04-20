@@ -126,3 +126,27 @@ export async function getSubscriptionByOrderId(orderId) {
     return null;
   }
 }
+
+// ==========================================
+// NEW: Shared Utility for Webhooks
+// ==========================================
+export async function markSubscriptionExpired(paymentId, userId) {
+  try {
+    // 1. Mark ledger as Expired
+    await docClient.send(new UpdateCommand({
+      TableName: "Subscriptions",
+      Key: { payment_id: paymentId },
+      UpdateExpression: "set #st = :exp",
+      ExpressionAttributeNames: { "#st": "status" },
+      ExpressionAttributeValues: { ":exp": "Expired" }
+    }));
+
+    // 2. Remove access from the user's main profile
+    await updateUserPlan(userId, "none");
+    
+    return true;
+  } catch (error) {
+    console.error(`Failed to expire subscription for user ${userId}:`, error);
+    return false;
+  }
+}

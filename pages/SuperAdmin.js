@@ -8,7 +8,7 @@ import config        from '../app/components/utils/config';
 import { signOut }   from 'next-auth/react';
 
 const API_URL = `${config.apiBaseUrl}/api/websites`;
-const POLL_INTERVAL = 5000;
+const POLL_INTERVAL = 3000;
 
 const SuperAdminPanel = () => {
   const router = useRouter();
@@ -26,6 +26,7 @@ const SuperAdminPanel = () => {
 
   const pollRef    = useRef(null);
   const itemsRef   = useRef(items);
+  const isMounted  = useRef(true);
   itemsRef.current = items;
 
   const userData = { planName: 'Super Admin', plan: true, maxBot: Infinity };
@@ -33,13 +34,25 @@ const SuperAdminPanel = () => {
   const [configData, setConfigData] = useState({
     websiteName: '', websiteUrl: '', category: [],
     systemPrompt: [], customPrompt: [], roles: [],
-    aifuture: [], status: 'active'
+    aifuture: [], status: 'active', description: '', tags: []
   });
   const [tempSystemPrompt, setTempSystemPrompt] = useState('');
   const [tempCustomPrompt, setTempCustomPrompt] = useState('');
   const [tempCategory, setTempCategory]         = useState('');
   const [tempRole, setTempRole]                 = useState('');
   const [tempRoleValue, setTempRoleValue]       = useState('');
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, []);
 
   // ── AUTH GUARD ──
   useEffect(() => {
@@ -89,11 +102,29 @@ const SuperAdminPanel = () => {
     return () => window.removeEventListener('popstate', blockBack);
   }, []);
 
-  // ── FETCH — ?superadmin=true so adminDeleted items bhi aayein ──
+  // ── IMMEDIATE UPDATE FUNCTIONS ──
+  const updateItemInList = useCallback((updatedItem) => {
+    setItems(prev => {
+      const newItems = prev.map(item => 
+        item.id === updatedItem.id ? { ...item, ...updatedItem } : item
+      );
+      return newItems;
+    });
+  }, []);
+
+  const removeItemFromList = useCallback((itemId) => {
+    setItems(prev => prev.filter(item => item.id !== itemId));
+  }, []);
+
+  const addItemToList = useCallback((newItem) => {
+    setItems(prev => [newItem, ...prev]);
+  }, []);
+
+  // ── FETCH ITEMS ──
   const fetchItems = useCallback(async (silent = false) => {
+    if (!isMounted.current) return;
     if (!silent) setLoading(true);
     try {
-      // superadmin=true → adminDeleted websites bhi dikhenge
       const res = await fetch(`${API_URL}?superadmin=true`, {
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store'
@@ -103,29 +134,23 @@ const SuperAdminPanel = () => {
 
       const processed = (data.items || []).map(item => ({
         ...item,
-        roles:    item.role    || item.roles    || [],
-        aifuture: item.aifuture || []
+        roles:        item.role    || item.roles    || [],
+        aifuture:     item.aifuture || [],
+        description:  item.description || '',
+        tags:         item.tags || []
       }));
 
-      setItems(prev => {
-        const prevMap = Object.fromEntries(prev.map(i => [i.id, i]));
-        return processed.map(newItem => {
-          const old = prevMap[newItem.id];
-          if (!old) return newItem;
-          if (
-            old.status           !== newItem.status ||
-            old.superAdminLocked !== newItem.superAdminLocked ||
-            old.adminDeleted     !== newItem.adminDeleted
-          ) return newItem;
-          return old;
-        });
-      });
+      if (isMounted.current) {
+        setItems(processed);
+      }
 
-      if (!silent) setShowForm(processed.length === 0);
+      if (!silent && isMounted.current) {
+        setShowForm(processed.length === 0);
+      }
     } catch (err) {
-      if (!silent) setError(err.message || 'Failed to fetch data');
+      if (!silent && isMounted.current) setError(err.message || 'Failed to fetch data');
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && isMounted.current) setLoading(false);
     }
   }, []);
 
@@ -136,7 +161,9 @@ const SuperAdminPanel = () => {
   useEffect(() => {
     if (!verified) return;
     pollRef.current = setInterval(() => {
-      fetchItems(true);
+      if (isMounted.current) {
+        fetchItems(true);
+      }
     }, POLL_INTERVAL);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [verified, fetchItems]);
@@ -146,7 +173,7 @@ const SuperAdminPanel = () => {
     setConfigData({
       websiteName: '', websiteUrl: '', category: [],
       systemPrompt: [], customPrompt: [], roles: [],
-      aifuture: [], status: 'active'
+      aifuture: [], status: 'active', description: '', tags: []
     });
     setTempSystemPrompt(''); setTempCustomPrompt('');
     setTempCategory(''); setTempRole(''); setTempRoleValue('');
@@ -156,7 +183,7 @@ const SuperAdminPanel = () => {
   const handleAddNew    = () => { resetForm(); setShowForm(true); };
   const handleShowList  = () => { resetForm(); setShowForm(false); };
 
-  // ── SUBMIT ──
+  // ── SUBMIT WITH IMMEDIATE UPDATE ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -165,6 +192,8 @@ const SuperAdminPanel = () => {
     const payload = {
       websiteName:  configData.websiteName,
       websiteUrl:   configData.websiteUrl,
+      description:  configData.description || '',
+      tags:         configData.tags || [],
       category:     configData.category,
       systemPrompt: configData.systemPrompt,
       customPrompt: configData.customPrompt,
@@ -188,11 +217,37 @@ const SuperAdminPanel = () => {
         throw new Error(errorData.error || `Failed: ${res.status}`);
       }
 
-      setShowSuccessMessage(editingId ? '✅ Website updated!' : '✅ Website created!');
+      const responseData = await res.json();
+      const savedItem = responseData.item || responseData;
+
+      // Prepare the item with proper structure
+      const processedItem = {
+        ...savedItem,
+        roles: savedItem.role || savedItem.roles || [],
+        aifuture: savedItem.aifuture || [],
+        description: savedItem.description || '',
+        tags: savedItem.tags || []
+      };
+
+      // Immediate UI update
+      if (editingId) {
+        updateItemInList(processedItem);
+        setShowSuccessMessage('✅ Website updated successfully!');
+      } else {
+        addItemToList(processedItem);
+        setShowSuccessMessage('✅ Website created successfully!');
+      }
+      
       setTimeout(() => setShowSuccessMessage(''), 3000);
-      await fetchItems(false);
+      
+      // Reset form and show list
       resetForm();
       setShowForm(false);
+      setEditingId(null);
+      
+      // Force a background refresh to ensure consistency
+      setTimeout(() => fetchItems(true), 100);
+      
     } catch (err) {
       setError(err.message || 'Error saving data');
     } finally {
@@ -200,8 +255,17 @@ const SuperAdminPanel = () => {
     }
   };
 
-  // ── STATUS CHANGE ──
+  // ── STATUS CHANGE WITH IMMEDIATE UPDATE ──
   const handleStatusChange = async (id, newStatus) => {
+    // Store original status for rollback
+    const originalItem = items.find(i => i.id === id);
+    const originalStatus = originalItem?.status;
+    
+    // Immediate optimistic UI update
+    setItems(prev => prev.map(i =>
+      i.id === id ? { ...i, status: newStatus } : i
+    ));
+
     try {
       const res = await fetch(`${API_URL}/${id}/status/role-aware`, {
         method:  'PATCH',
@@ -212,6 +276,7 @@ const SuperAdminPanel = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update status');
 
+      // Update with server response to ensure correct state
       setItems(prev => prev.map(i =>
         i.id === id
           ? { ...i, status: newStatus, superAdminLocked: data.superAdminLocked || false }
@@ -221,8 +286,13 @@ const SuperAdminPanel = () => {
       const lockMsg = data.superAdminLocked ? ' 🔒 Admin cannot reactivate' : '';
       setShowSuccessMessage(`✅ Status updated to ${newStatus}${lockMsg}`);
       setTimeout(() => setShowSuccessMessage(''), 3000);
+      
     } catch (err) {
       setError(err.message || 'Error updating status');
+      // Rollback on error
+      setItems(prev => prev.map(i =>
+        i.id === id ? { ...i, status: originalStatus } : i
+      ));
     }
   };
 
@@ -233,6 +303,8 @@ const SuperAdminPanel = () => {
       setConfigData({
         websiteName:  item.websiteName,
         websiteUrl:   item.websiteUrl,
+        description:  item.description || '',
+        tags:         item.tags || [],
         category:     item.category     || [],
         systemPrompt: item.systemPrompt || [],
         customPrompt: item.customPrompt || [],
@@ -246,26 +318,52 @@ const SuperAdminPanel = () => {
     }
   };
 
-  // ── PERMANENT DELETE (SuperAdmin only) ──
+  // ── PERMANENT DELETE WITH IMMEDIATE UPDATE ──
   const handleDelete = async (id) => {
+    // Store the item for potential rollback
+    const deletedItem = items.find(i => i.id === id);
+    
+    // Immediate UI update - remove from list
+    removeItemFromList(id);
+    setShowSuccessMessage('✅ Website deleted successfully!');
+    setTimeout(() => setShowSuccessMessage(''), 2000);
+    
     try {
       const res = await fetch(`${API_URL}/${id}`, {
         method:  'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
-      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
-
-      setShowSuccessMessage('✅ Website permanently deleted!');
-      setTimeout(() => setShowSuccessMessage(''), 2000);
-      setItems(prev => prev.filter(item => item.id !== id));
-      if (items.length <= 1) setShowForm(true);
+      
+      if (!res.ok) {
+        throw new Error(`Delete failed: ${res.status}`);
+      }
+      
+      // If list becomes empty, show form
+      if (items.length <= 1) {
+        setShowForm(true);
+      }
+      
+      // Background refresh
+      setTimeout(() => fetchItems(true), 100);
+      
     } catch (err) {
       setError(err.message || 'Delete error');
+      // Rollback - add the item back
+      if (deletedItem) {
+        addItemToList(deletedItem);
+      }
     }
   };
 
-  // ── RESTORE (Admin ne delete kiya tha, SuperAdmin wapas la sakta hai) ──
+  // ── RESTORE WITH IMMEDIATE UPDATE ──
   const handleRestore = async (id) => {
+    // Immediate optimistic UI update
+    setItems(prev => prev.map(item =>
+      item.id === id
+        ? { ...item, adminDeleted: false, adminDeletedAt: null }
+        : item
+    ));
+
     try {
       const res = await fetch(`${API_URL}/${id}/restore`, {
         method:  'PATCH',
@@ -275,17 +373,20 @@ const SuperAdminPanel = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Restore failed');
 
-      // Optimistic update
-      setItems(prev => prev.map(item =>
-        item.id === id
-          ? { ...item, adminDeleted: false, adminDeletedAt: null }
-          : item
-      ));
-
       setShowSuccessMessage('✅ Website restored! Admin can see it again.');
       setTimeout(() => setShowSuccessMessage(''), 3000);
+      
+      // Background refresh
+      setTimeout(() => fetchItems(true), 100);
+      
     } catch (err) {
       setError(err.message || 'Restore error');
+      // Rollback
+      setItems(prev => prev.map(item =>
+        item.id === id
+          ? { ...item, adminDeleted: true }
+          : item
+      ));
     }
   };
 
@@ -314,7 +415,7 @@ const SuperAdminPanel = () => {
 
   if (!verified) return null;
 
-  if (loading) {
+  if (loading && items.length === 0) {
     return (
       <div className={styles.adminContainer}>
         <div className={styles.loading}>
@@ -328,9 +429,10 @@ const SuperAdminPanel = () => {
     );
   }
 
-  // Stats — adminDeleted wale alag count karo
+  // Stats
   const adminDeletedCount = items.filter(i => i.adminDeleted === true).length;
-  const visibleItems      = items.filter(i => i.adminDeleted !== true);
+  const activeCount = items.filter(i => i.status === 'active' && !i.adminDeleted).length;
+  const inactiveCount = items.filter(i => i.status === 'inactive' && !i.adminDeleted).length;
 
   // ── MAIN RENDER ──
   return (
@@ -410,22 +512,27 @@ const SuperAdminPanel = () => {
       <div className={styles.adminContent}>
         <div className={styles.headerBottom}>
           <div className={styles.actionButtons}>
-            <div className={styles.buttonWithUpgrade}>
-              <button className={styles.primaryButton} onClick={handleAddNew}>
-                <span className={styles.buttonIcon}>+</span>
-                Add New Website
-              </button>
-            </div>
+          <div className={styles.buttonWithUpgrade}>
+    <button
+      className={styles.primaryButton}
+      onClick={showForm ? handleShowList : handleAddNew}
+    >
+      <span className={styles.buttonIcon}>
+        {showForm ? '←' : '+'}
+      </span>
+      {showForm ? 'Back to List' : 'Add New Website'}
+    </button>
+  </div>
 
             {items.length > 0 && (
               <div className={styles.statsBox}>
                 <div className={styles.statItem}>
-                  <span className={styles.statNumber}>{items.filter(i => i.status === 'active' && !i.adminDeleted).length}</span>
+                  <span className={styles.statNumber}>{activeCount}</span>
                   <span className={styles.statLabel}>Active</span>
                 </div>
                 <div className={styles.statDivider}>|</div>
                 <div className={styles.statItem}>
-                  <span className={styles.statNumber}>{items.filter(i => i.status === 'inactive' && !i.adminDeleted).length}</span>
+                  <span className={styles.statNumber}>{inactiveCount}</span>
                   <span className={styles.statLabel}>Inactive</span>
                 </div>
                 <div className={styles.statDivider}>|</div>

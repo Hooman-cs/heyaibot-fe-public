@@ -2,119 +2,94 @@
 import { useState, useEffect } from 'react';
 import styles from './ChatHeader.module.css';
 
-const ChatHeader = ({ 
-
-  primaryColor = '#ff6347',
-  headerColor, 
-  connectionStatus = 'connected', 
+const ChatHeader = ({
+  primaryColor    = '#ff6347',
+  headerColor,
+  connectionStatus = 'connected',
   onClose,
-  apiBaseUrl = '', 
-  backendApiKey = '',
-  websiteTitle = 'Support',
+  apiBaseUrl      = '',
+  backendApiKey   = '',
+  websiteTitle    = 'Support',
   isWebsiteActive = true,
-  websiteStatus = 'active',
+  websiteStatus   = 'active',
   showCloseButton = false
 }) => {
-  const [status, setStatus] = useState({ text: 'Connecting...', color: '#FF9800' });
+  const [status,    setStatus]    = useState({ text: 'Connecting...', color: 'rgba(255,255,255,0.6)' });
   const [isLoading, setIsLoading] = useState(true);
-
-  // Log to verify headerColor is received
-
 
   useEffect(() => {
     const fetchWebsiteByApiKey = async () => {
       if (!backendApiKey || !apiBaseUrl) {
-        setStatus({ text: 'Configuration Error', color: '#F44336' });
+        setStatus({ text: 'Configuration Error', color: '#ffb3b3' });
         setIsLoading(false);
         return;
       }
-
       try {
-        const response = await fetch(`${apiBaseUrl}/api/websites/header?apiKey=${encodeURIComponent(backendApiKey)}`, {
-          method: 'GET',
-          headers: { 
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        const response = await fetch(
+          `${apiBaseUrl}/api/websites/header?apiKey=${encodeURIComponent(backendApiKey)}`,
+          { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-
         if (data.success && data.item) {
-          const websiteData = data.item;
-          
-          if (websiteData.status === 'active') {
-            setStatus({ text: 'Online', color: '#4CAF50' });
-          } else {
-            setStatus({ text: 'Offline', color: '#F44336' });
-          }
+          setStatus(
+            data.item.status === 'active'
+              ? { text: 'Online',  color: '#4ade80' }
+              : { text: 'Offline', color: '#fca5a5' }
+          );
         } else {
-          setStatus({ text: 'Not Found', color: '#F44336' });
+          setStatus({ text: 'Not Found', color: '#fca5a5' });
         }
-      } catch (error) {
-        setStatus({ text: 'Connection Error', color: '#F44336' });
+      } catch {
+        setStatus({ text: 'Offline', color: '#fca5a5' });
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchWebsiteByApiKey();
   }, [apiBaseUrl, backendApiKey]);
 
   return (
-    <div 
-      className={styles.chatHeader} 
-      style={{ 
-        // ✅ Use headerColor from database if available, otherwise fallback to secondaryColor
-        backgroundColor: headerColor || primaryColor,
-        borderBottom: `1px solid ${primaryColor}20`
-      }}
+    <div
+      className={styles.chatHeader}
+      style={{ backgroundColor: headerColor || primaryColor }}
     >
       <div className={styles.headerContent}>
         <div className={styles.headerInfo}>
+
+          {/* Avatar */}
           <div className={styles.avatarContainer}>
             <div className={styles.medicalAvatar}>👨</div>
-            <div 
-              className={styles.statusIndicator} 
-              style={{ backgroundColor: status.color }}
+            <div
+              className={styles.statusIndicator}
+              style={{
+                backgroundColor: status.color,
+                // ✅ Glow sirf online pe
+               
+              }}
               title={status.text}
             />
           </div>
-          
+
+          {/* Title + status */}
           <div className={styles.titleContainer}>
             <h2 className={styles.title}>
               {isLoading ? 'Loading...' : websiteTitle}
             </h2>
-            <div className={styles.statusText} style={{ color: status.color }}>
-              {status.text}
+            <div
+              className={styles.statusText}
+              style={{ color: status.color }}
+            >
+              {isLoading ? 'Connecting...' : status.text}
             </div>
           </div>
         </div>
 
         {showCloseButton && (
           <div className={styles.headerActions}>
-            <button 
+            <button
               className={styles.closeButton}
               onClick={onClose}
-              style={{ 
-                color: 'white',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '24px',
-                width: '40px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               aria-label="Close chat"
             >
               ×
